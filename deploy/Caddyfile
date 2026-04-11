@@ -1,0 +1,25 @@
+# Main platform domain
+{$PLATFORM_DOMAIN} {
+    # Frontend
+    handle {
+        reverse_proxy frontend:80
+    }
+}
+
+# API under /api
+{$PLATFORM_DOMAIN}/api/* {
+    reverse_proxy api:8080
+}
+
+# Wildcard subdomains for deployed user apps
+*.{$PLATFORM_DOMAIN} {
+    @app_subdomain host *.{$PLATFORM_DOMAIN}
+
+    handle @app_subdomain {
+        # Caddy Admin API will dynamically add routes here
+        # Each deployed app gets its own subdomain routing
+        reverse_proxy {
+            dynamic a
+        }
+    }
+}

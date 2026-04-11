@@ -1,27 +1,70 @@
-# Workspace
+# DevLaunch — AI-Powered App Generator Platform
 
 ## Overview
 
-pnpm workspace monorepo using TypeScript. Each package manages its own dependencies.
+A self-hostable developer platform where users describe an app idea, Claude generates complete production-ready code, and the platform deploys it instantly as a live URL. Built to run on your own Hetzner server.
 
 ## Stack
 
 - **Monorepo tool**: pnpm workspaces
 - **Node.js version**: 24
 - **Package manager**: pnpm
-- **TypeScript version**: 5.9
+- **Frontend**: React + Vite + Tailwind (dark terminal aesthetic)
 - **API framework**: Express 5
 - **Database**: PostgreSQL + Drizzle ORM
+- **AI**: Claude (Anthropic) via `@workspace/integrations-anthropic-ai`
+- **Container management**: dockerode (Docker SDK)
 - **Validation**: Zod (`zod/v4`), `drizzle-zod`
 - **API codegen**: Orval (from OpenAPI spec)
 - **Build**: esbuild (CJS bundle)
+
+## Key Features
+
+- Describe an app idea → Claude generates complete code (all files)
+- Every generated app includes: Dockerfile, docker-compose.yml, GitHub Actions CI/CD
+- Deploy generated apps as isolated Docker containers (on Hetzner)
+- Automatic subdomain routing per deployed app
+- AI chat assistant for developer questions
+- Redeploy (CI/CD trigger) support
+
+## Hetzner Deployment
+
+Everything needed to self-host is included:
+
+- `Dockerfile` — multi-stage build for API + frontend
+- `docker-compose.yml` — runs platform + postgres + caddy together
+- `deploy/Caddyfile` — automatic HTTPS + wildcard subdomain routing
+- `.env.example` — fill in domain, Anthropic API key, DB password
+- `.github/workflows/deploy.yml` — GitHub Actions CI/CD auto-redeploy on push
+- `deploy/README.md` — full step-by-step Hetzner setup guide
+
+### Deploy on Hetzner (3 steps)
+
+```bash
+# 1. SSH into your Hetzner server
+ssh root@YOUR_SERVER_IP
+
+# 2. Install Docker
+curl -fsSL https://get.docker.com | sh
+
+# 3. Copy project, fill .env, and launch
+cp .env.example .env && nano .env
+docker compose up -d
+```
 
 ## Key Commands
 
 - `pnpm run typecheck` — full typecheck across all packages
 - `pnpm run build` — typecheck + build all packages
-- `pnpm --filter @workspace/api-spec run codegen` — regenerate API hooks and Zod schemas from OpenAPI spec
-- `pnpm --filter @workspace/db run push` — push DB schema changes (dev only)
+- `pnpm --filter @workspace/api-spec run codegen` — regenerate API hooks from OpenAPI spec
+- `pnpm --filter @workspace/db run push` — push DB schema changes
 - `pnpm --filter @workspace/api-server run dev` — run API server locally
+- `pnpm --filter @workspace/code-gen run dev` — run frontend locally
 
-See the `pnpm-workspace` skill for workspace structure, TypeScript setup, and package details.
+## Environment Variables
+
+For Hetzner deployment (fill in `.env`):
+- `PLATFORM_DOMAIN` — your domain (e.g. myplatform.com)
+- `ANTHROPIC_API_KEY` — from console.anthropic.com
+- `POSTGRES_PASSWORD` — strong DB password
+- `SESSION_SECRET` — random secret (openssl rand -hex 32)
