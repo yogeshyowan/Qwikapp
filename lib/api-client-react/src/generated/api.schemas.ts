@@ -8,3 +8,88 @@
 export interface HealthStatus {
   status: string;
 }
+
+export type ProjectStatus = (typeof ProjectStatus)[keyof typeof ProjectStatus];
+
+export const ProjectStatus = {
+  pending: "pending",
+  generating: "generating",
+  done: "done",
+  error: "error",
+} as const;
+
+export interface Project {
+  id: number;
+  title: string;
+  description: string;
+  techStack: string;
+  status: ProjectStatus;
+  conversationId?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateProjectBody {
+  title: string;
+  description: string;
+  techStack: string;
+}
+
+export interface ProjectFile {
+  id: number;
+  projectId: number;
+  filename: string;
+  language: string;
+  content: string;
+  createdAt: string;
+}
+
+export type ProjectStatsTechStackBreakdownItem = {
+  techStack: string;
+  count: number;
+};
+
+export interface ProjectStats {
+  totalProjects: number;
+  completedProjects: number;
+  totalFilesGenerated: number;
+  techStackBreakdown: ProjectStatsTechStackBreakdownItem[];
+}
+
+export interface Conversation {
+  id: string;
+  title: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateConversationBody {
+  title: string;
+}
+
+export type MessageRole = (typeof MessageRole)[keyof typeof MessageRole];
+
+export const MessageRole = {
+  user: "user",
+  assistant: "assistant",
+} as const;
+
+export interface Message {
+  id: string;
+  conversationId: string;
+  role: MessageRole;
+  content: string;
+  createdAt: string;
+}
+
+export interface ConversationWithMessages {
+  id: string;
+  title: string;
+  createdAt: string;
+  updatedAt: string;
+  messages: Message[];
+}
+
+export interface SendAnthropicMessageBody {
+  content: string;
+}

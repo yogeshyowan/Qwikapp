@@ -14,3 +14,145 @@ import * as zod from "zod";
 export const HealthCheckResponse = zod.object({
   status: zod.string(),
 });
+
+/**
+ * @summary List all projects
+ */
+export const ListProjectsResponseItem = zod.object({
+  id: zod.number(),
+  title: zod.string(),
+  description: zod.string(),
+  techStack: zod.string(),
+  status: zod.enum(["pending", "generating", "done", "error"]),
+  conversationId: zod.string().nullish(),
+  createdAt: zod.string(),
+  updatedAt: zod.string(),
+});
+export const ListProjectsResponse = zod.array(ListProjectsResponseItem);
+
+/**
+ * @summary Create a new project
+ */
+export const CreateProjectBody = zod.object({
+  title: zod.string(),
+  description: zod.string(),
+  techStack: zod.string(),
+});
+
+/**
+ * @summary Get a project by ID
+ */
+export const GetProjectParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const GetProjectResponse = zod.object({
+  id: zod.number(),
+  title: zod.string(),
+  description: zod.string(),
+  techStack: zod.string(),
+  status: zod.enum(["pending", "generating", "done", "error"]),
+  conversationId: zod.string().nullish(),
+  createdAt: zod.string(),
+  updatedAt: zod.string(),
+});
+
+/**
+ * @summary Delete a project
+ */
+export const DeleteProjectParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+/**
+ * @summary List files in a project
+ */
+export const ListProjectFilesParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const ListProjectFilesResponseItem = zod.object({
+  id: zod.number(),
+  projectId: zod.number(),
+  filename: zod.string(),
+  language: zod.string(),
+  content: zod.string(),
+  createdAt: zod.string(),
+});
+export const ListProjectFilesResponse = zod.array(ListProjectFilesResponseItem);
+
+/**
+ * @summary Get overall project statistics
+ */
+export const GetProjectStatsResponse = zod.object({
+  totalProjects: zod.number(),
+  completedProjects: zod.number(),
+  totalFilesGenerated: zod.number(),
+  techStackBreakdown: zod.array(
+    zod.object({
+      techStack: zod.string(),
+      count: zod.number(),
+    }),
+  ),
+});
+
+/**
+ * @summary List conversations
+ */
+export const ListConversationsResponseItem = zod.object({
+  id: zod.string(),
+  title: zod.string(),
+  createdAt: zod.string(),
+  updatedAt: zod.string(),
+});
+export const ListConversationsResponse = zod.array(
+  ListConversationsResponseItem,
+);
+
+/**
+ * @summary Create a new conversation
+ */
+export const CreateConversationBody = zod.object({
+  title: zod.string(),
+});
+
+/**
+ * @summary Get conversation with messages
+ */
+export const GetConversationParams = zod.object({
+  conversationId: zod.coerce.string(),
+});
+
+export const GetConversationResponse = zod.object({
+  id: zod.string(),
+  title: zod.string(),
+  createdAt: zod.string(),
+  updatedAt: zod.string(),
+  messages: zod.array(
+    zod.object({
+      id: zod.string(),
+      conversationId: zod.string(),
+      role: zod.enum(["user", "assistant"]),
+      content: zod.string(),
+      createdAt: zod.string(),
+    }),
+  ),
+});
+
+/**
+ * @summary Delete a conversation
+ */
+export const DeleteConversationParams = zod.object({
+  conversationId: zod.coerce.string(),
+});
+
+/**
+ * @summary Send a message and stream the response
+ */
+export const SendAnthropicMessageParams = zod.object({
+  conversationId: zod.coerce.string(),
+});
+
+export const SendAnthropicMessageBody = zod.object({
+  content: zod.string(),
+});

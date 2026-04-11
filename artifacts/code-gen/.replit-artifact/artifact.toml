@@ -1,0 +1,31 @@
+kind = "web"
+previewPath = "/"
+title = "AI Code Generator"
+version = "1.0.0"
+id = "artifacts/code-gen"
+router = "path"
+
+[[integratedSkills]]
+name = "react-vite"
+version = "1.0.0"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 25494
+
+[services.development]
+run = "pnpm --filter @workspace/code-gen run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/code-gen", "run", "build" ]
+publicDir = "artifacts/code-gen/dist/public"
+serve = "static"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "25494"
+BASE_PATH = "/"
