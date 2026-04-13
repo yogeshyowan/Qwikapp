@@ -16,8 +16,11 @@ RUN pnpm install --frozen-lockfile
 
 FROM deps AS builder
 COPY . .
+ENV BASE_PATH=/
+ENV PORT=3000
+ENV NODE_ENV=production
 RUN pnpm --filter @workspace/api-server run build
-RUN BASE_PATH=/ PORT=3000 pnpm --filter @workspace/code-gen run build
+RUN pnpm --filter @workspace/code-gen run build
 
 FROM node:24-alpine AS api
 RUN npm install -g pnpm@10
