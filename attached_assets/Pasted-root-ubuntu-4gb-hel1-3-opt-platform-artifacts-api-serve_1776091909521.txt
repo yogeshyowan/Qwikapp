@@ -1,0 +1,63 @@
+root@ubuntu-4gb-hel1-3:/opt/platform/artifacts/api-server# ls /etc/nginx/conf.d/
+ls: cannot access '/etc/nginx/conf.d/': No such file or directory
+root@ubuntu-4gb-hel1-3:/opt/platform/artifacts/api-server# ss -tlnp | grep ':80'
+LISTEN 0      4096         0.0.0.0:80        0.0.0.0:*    users:(("docker-proxy",pid=1384,fd=8))
+LISTEN 0      4096            [::]:80           [::]:*    users:(("docker-proxy",pid=1402,fd=8))
+LISTEN 0      511                *:8080            *:*    users:(("node /opt/platf",pid=36978,fd=31))
+root@ubuntu-4gb-hel1-3:/opt/platform/artifacts/api-server# docker ps
+CONTAINER ID   IMAGE                COMMAND                  CREATED       STATUS                 PORTS                                                                                                                             NAMES
+7b27f51a88ac   caddy:2-alpine       "caddy run --config …"   4 hours ago   Up 2 hours             0.0.0.0:80->80/tcp, [::]:80->80/tcp, 0.0.0.0:443->443/tcp, [::]:443->443/tcp, 0.0.0.0:443->443/udp, [::]:443->443/udp, 2019/tcp   platform-caddy-1
+c2ecedf06e30   platform-api         "docker-entrypoint.s…"   4 hours ago   Up 2 hours             8080/tcp                                                                                                                          platform-api-1
+c0d7f4501517   postgres:16-alpine   "docker-entrypoint.s…"   4 hours ago   Up 2 hours (healthy)   5432/tcp                                                                                                                          platform-db-1
+d063d46b0257   platform-frontend    "/docker-entrypoint.…"   4 hours ago   Up 2 hours             80/tcp                                                                                                                            platform-frontend-1
+root@ubuntu-4gb-hel1-3:/opt/platform/artifacts/api-server# cd /opt/platform
+root@ubuntu-4gb-hel1-3:/opt/platform# git pull origin main
+From https://github.com/yogeshyowan/Qwikapp
+ * branch            main       -> FETCH_HEAD
+Already up to date.
+root@ubuntu-4gb-hel1-3:/opt/platform# docker compose build api
+WARN[0000] /opt/platform/docker-compose.yml: the attribute `version` is obsolete, it will be ignored, please remove it to avoid potential confusion
+[+] Building 127.1s (28/28) FINISHED
+ => [internal] load local bake definitions                                                                         0.0s
+ => => reading from stdin 491B                                                                                     0.0s
+ => [internal] load build definition from Dockerfile                                                               0.0s
+ => => transferring dockerfile: 1.57kB                                                                             0.0s
+ => [internal] load metadata for docker.io/library/node:24-slim                                                    0.8s
+ => [internal] load .dockerignore                                                                                  0.0s
+ => => transferring context: 2B                                                                                    0.0s
+ => [internal] load build context                                                                                  6.4s
+ => => transferring context: 18.89MB                                                                               5.1s
+ => [base 1/3] FROM docker.io/library/node:24-slim@sha256:b506e7321f176aae77317f99d67a24b272c1f09f1d10f1761f27734  1.0s
+ => => resolve docker.io/library/node:24-slim@sha256:b506e7321f176aae77317f99d67a24b272c1f09f1d10f1761f2773447d8d  1.0s
+ => CACHED [base 2/3] RUN npm install -g pnpm@10                                                                   0.0s
+ => CACHED [base 3/3] WORKDIR /app                                                                                 0.0s
+ => [deps  1/11] COPY package.json pnpm-workspace.yaml pnpm-lock.yaml ./                                           0.1s
+ => [deps  2/11] COPY tsconfig.base.json tsconfig.json ./                                                          0.0s
+ => [deps  3/11] COPY lib/db/package.json ./lib/db/                                                                0.0s
+ => [deps  4/11] COPY lib/api-spec/package.json ./lib/api-spec/                                                    0.0s
+ => [deps  5/11] COPY lib/api-zod/package.json ./lib/api-zod/                                                      0.0s
+ => [deps  6/11] COPY lib/api-client-react/package.json ./lib/api-client-react/                                    0.0s
+ => [deps  7/11] COPY lib/integrations-anthropic-ai/package.json ./lib/integrations-anthropic-ai/                  0.0s
+ => [deps  8/11] COPY artifacts/api-server/package.json ./artifacts/api-server/                                    0.0s
+ => [deps  9/11] COPY artifacts/code-gen/package.json ./artifacts/code-gen/                                        0.0s
+ => [deps 10/11] COPY scripts/package.json ./scripts/                                                              0.0s
+ => [deps 11/11] RUN pnpm install --frozen-lockfile                                                               18.1s
+ => [builder 1/3] COPY . .                                                                                        39.8s
+ => [api 4/7] COPY --from=deps /app/node_modules ./node_modules                                                   11.1s
+ => [api 5/7] COPY --from=deps /app/artifacts/api-server/node_modules ./artifacts/api-server/node_modules          0.6s
+ => [builder 2/3] RUN pnpm --filter @workspace/api-server run build                                                2.3s
+ => [builder 3/3] RUN pnpm --filter @workspace/code-gen run build                                                  8.9s
+ => [api 6/7] COPY --from=builder /app/artifacts/api-server/dist ./artifacts/api-server/dist                       0.1s
+ => [api 7/7] COPY artifacts/api-server/package.json ./artifacts/api-server/                                       0.0s
+ => exporting to image                                                                                            49.6s
+ => => exporting layers                                                                                           33.4s
+ => => exporting manifest sha256:7d8f40266cb35b3b7b924ba74def4d9fa0055adc50975514fb300e2059ed8286                  0.0s
+ => => exporting config sha256:932a16ca4fa88cedcebc878674085f6fbaddeafde73486da09dd4bc58342a834                    0.0s
+ => => exporting attestation manifest sha256:6912989a2c3aedbb5b701425bb36c9b910f1cbb76159a373c1f533c48010084f      0.0s
+ => => exporting manifest list sha256:481ab9971cf365b86f72e6fcca9ca20a6e6297f9aea4a550bc689afa36da0abb             0.0s
+ => => naming to docker.io/library/platform-api:latest                                                             0.0s
+ => => unpacking to docker.io/library/platform-api:latest                                                         16.0s
+ => resolving provenance for metadata file                                                                         0.0s
+[+] build 1/1
+ ✔ Image platform-api Built                                                                                       127.3s
+root@ubuntu-4gb-hel1-3:/opt/platform#
