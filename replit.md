@@ -29,6 +29,8 @@ The Replit development PostgreSQL database is provisioned and the Drizzle schema
 
 AI generation uses the user's own Anthropic key from Replit Secrets via `ANTHROPIC_API_KEY`. The server also accepts `MYANTHROPIC_API_KEY`, `MY_ANTHROPIC_API_KEY`, or `CLAUDE_API_KEY` as aliases, but it does not fall back to Replit Anthropic integration variables. Generated app files are stored in the `project_files` database table linked to the project ID.
 
+Generated project detail pages include a `Preview` tab. The preview renders the generated files from the database inside a sandboxed iframe so users can inspect what Claude built even when Docker is unavailable in the Replit development environment.
+
 ## Key Features
 
 - Describe an app idea → Claude generates complete code (all files)

@@ -5,7 +5,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Terminal, FileCode, Play, Send, Loader2, Globe, ExternalLink, RefreshCw } from "lucide-react";
+import { Terminal, FileCode, Play, Send, Loader2, Globe, ExternalLink, RefreshCw, Eye } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -28,6 +28,7 @@ export default function ProjectDetail() {
   }, [files, activeFileId]);
 
   const activeFile = files?.find(f => f.id === activeFileId);
+  const previewDocument = files ? buildPreviewDocument(files) : "";
 
   // Chat State
   const [chatInput, setChatInput] = useState("");
@@ -146,6 +147,9 @@ export default function ProjectDetail() {
           <TabsTrigger value="files" className="data-[state=active]:bg-transparent data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none pb-3 pt-2 px-1 font-mono tracking-wider">
             <FileCode className="h-4 w-4 mr-2" /> FILES
           </TabsTrigger>
+          <TabsTrigger value="preview" className="data-[state=active]:bg-transparent data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none pb-3 pt-2 px-1 font-mono tracking-wider">
+            <Eye className="h-4 w-4 mr-2" /> PREVIEW
+          </TabsTrigger>
           <TabsTrigger value="chat" className="data-[state=active]:bg-transparent data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none pb-3 pt-2 px-1 font-mono tracking-wider">
             <Terminal className="h-4 w-4 mr-2" /> TERMINAL CHAT
           </TabsTrigger>
@@ -197,6 +201,35 @@ export default function ProjectDetail() {
               )}
             </ScrollArea>
           </div>
+        </TabsContent>
+
+        <TabsContent value="preview" className="flex-1 mt-6 h-full overflow-hidden border border-border rounded-lg bg-card flex flex-col">
+          <div className="p-3 border-b border-border bg-sidebar/50 text-xs font-bold text-muted-foreground uppercase tracking-wider flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <Eye className="h-4 w-4" /> Generated App Preview
+            </div>
+            <span className="text-[10px] normal-case font-normal text-muted-foreground">
+              Sandboxed browser preview from saved project files
+            </span>
+          </div>
+          {filesLoading ? (
+            <div className="p-6 space-y-3">
+              <Skeleton className="h-8 w-64" />
+              <Skeleton className="h-96 w-full" />
+            </div>
+          ) : files && files.length > 0 ? (
+            <iframe
+              key={`${projectId}-${files.map((file) => `${file.id}:${file.createdAt}`).join("|")}`}
+              title={`${project.title} preview`}
+              sandbox="allow-scripts allow-forms allow-modals"
+              srcDoc={previewDocument}
+              className="w-full flex-1 bg-white"
+            />
+          ) : (
+            <div className="flex-1 flex items-center justify-center text-center p-8 text-muted-foreground">
+              Generate the project first to see a live preview here.
+            </div>
+          )}
         </TabsContent>
 
         <TabsContent value="chat" className="flex-1 mt-6 h-full overflow-hidden border border-border rounded-lg bg-card flex flex-col">
@@ -281,4 +314,80 @@ export default function ProjectDetail() {
       </Tabs>
     </div>
   );
+}
+
+type PreviewFile = {
+  filename: string;
+  language: string;
+  content: string;
+};
+
+function buildPreviewDocument(files: PreviewFile[]): string {
+  const css = files
+    .filter((file) => file.filename.endsWith(".css"))
+    .map((file) => `\n/* ${file.filename} */\n${file.content}`)
+    .join("\n");
+  const scripts = files
+    .filter((file) => /\.(jsx?|tsx?)$/.test(file.filename))
+    .sort((a, b) => scoreScript(a.filename) - scoreScript(b.filename))
+    .map((file) => `\n/* ${file.filename} */\n${preparePreviewScript(file.content)}`)
+    .join("\n");
+  const hasApp = /\bfunction\s+App\b|\bconst\s+App\b|\bclass\s+App\b/.test(scripts);
+  const renderCode = hasApp
+    ? "ReactDOM.createRoot(document.getElementById('root')).render(<App />);"
+    : "document.getElementById('root').innerHTML = '<div class=\"preview-error\"><h1>Preview unavailable</h1><p>No App component was found in the generated files.</p></div>';";
+
+  return `<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <style>
+      html, body, #root { min-height: 100%; margin: 0; }
+      body { background: #fff; color: #111827; }
+      .preview-error { font-family: Inter, system-ui, sans-serif; padding: 32px; color: #111827; }
+      ${css}
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script type="text/babel">
+      const { useState, useEffect, useMemo, useCallback, useRef } = React;
+      ${scripts}
+      ${renderCode}
+    </script>
+  </body>
+</html>`;
+}
+
+function scoreScript(filename: string): number {
+  if (/src\/main\.(jsx?|tsx?)$/.test(filename) || /src\/index\.(jsx?|tsx?)$/.test(filename)) {
+    return 100;
+  }
+  if (/src\/App\.(jsx?|tsx?)$/.test(filename)) {
+    return 90;
+  }
+  return 10;
+}
+
+function preparePreviewScript(source: string): string {
+  return source
+    .replace(/^\s*import\s+["'][^"']+\.css["'];?\s*$/gm, "")
+    .replace(/^\s*import\s+[^;]+from\s+["']react["'];?\s*$/gm, "")
+    .replace(/^\s*import\s+[^;]+from\s+["']react-dom\/client["'];?\s*$/gm, "")
+    .replace(/^\s*import\s+[^;]+from\s+["']\.{1,2}\/[^"']+["'];?\s*$/gm, "")
+    .replace(/^\s*import\s+["']\.{1,2}\/[^"']+["'];?\s*$/gm, "")
+    .replace(/\bexport\s+default\s+function\s+([A-Za-z0-9_$]+)/g, "function $1")
+    .replace(/\bexport\s+default\s+class\s+([A-Za-z0-9_$]+)/g, "class $1")
+    .replace(/\bexport\s+default\s+([A-Za-z0-9_$]+);?/g, "")
+    .replace(/\bexport\s+function\s+/g, "function ")
+    .replace(/\bexport\s+const\s+/g, "const ")
+    .replace(/\bexport\s+let\s+/g, "let ")
+    .replace(/\bexport\s+var\s+/g, "var ")
+    .replace(/ReactDOM\.createRoot\([^)]*\)\.render\([\s\S]*?\);?/g, "")
+    .replace(/const\s+root\s*=\s*ReactDOM\.createRoot\([^;]+;?/g, "")
+    .replace(/root\.render\([\s\S]*?\);?/g, "");
 }
