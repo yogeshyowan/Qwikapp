@@ -1,0 +1,27 @@
+0|api-serv | Error: PORT environment variable is required but was not provided.
+0|api-serv |     at file:///opt/platform/artifacts/api-server/src/index.ts:8:9
+0|api-serv |     at ModuleJob.run (node:internal/modules/esm/module_job:195:25)
+0|api-serv |     at ModuleLoader.import (node:internal/modules/esm/loader:336:24)
+0|api-serv |     at importModuleDynamicallyWrapper (node:internal/vm/module:429:15)
+0|api-serv | Error: PORT environment variable is required but was not provided.
+0|api-serv |     at file:///opt/platform/artifacts/api-server/src/index.ts:8:9
+0|api-serv |     at ModuleJob.run (node:internal/modules/esm/module_job:195:25)
+0|api-serv |     at ModuleLoader.import (node:internal/modules/esm/loader:336:24)
+0|api-serv |     at importModuleDynamicallyWrapper (node:internal/vm/module:429:15)
+0|api-serv | Error: PORT environment variable is required but was not provided.
+0|api-serv |     at file:///opt/platform/artifacts/api-server/src/index.ts:8:9
+0|api-serv |     at ModuleJob.run (node:internal/modules/esm/module_job:195:25)
+0|api-serv |     at ModuleLoader.import (node:internal/modules/esm/loader:336:24)
+0|api-serv |     at importModuleDynamicallyWrapper (node:internal/vm/module:429:15)
+0|api-serv | Error: PORT environment variable is required but was not provided.
+0|api-serv |     at file:///opt/platform/artifacts/api-server/src/index.ts:8:9
+0|api-serv |     at ModuleJob.run (node:internal/modules/esm/module_job:195:25)
+0|api-serv |     at ModuleLoader.import (node:internal/modules/esm/loader:336:24)
+0|api-serv |     at importModuleDynamicallyWrapper (node:internal/vm/module:429:15)
+
+0|api-server  | Error: PORT environment variable is required but was not provided.
+0|api-server  |     at file:///opt/platform/artifacts/api-server/src/index.ts:8:9
+0|api-server  |     at ModuleJob.run (node:internal/modules/esm/module_job:195:25)
+0|api-server  |     at ModuleLoader.import (node:internal/modules/esm/loader:336:24)
+0|api-server  |     at importModuleDynamicallyWrapper (node:internal/vm/module:429:15)
+0|api-server  | Error: PORT environment variable is required but was not provided.
