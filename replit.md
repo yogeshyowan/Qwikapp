@@ -27,6 +27,8 @@ The project runs on Replit as two workflows:
 
 The Replit development PostgreSQL database is provisioned and the Drizzle schema has been pushed with `pnpm --filter @workspace/db run push`. Frontend and API traffic are kept separate by service path routing, with browser API requests going to `/api`.
 
+AI generation uses the user's own Anthropic key from Replit Secrets via `ANTHROPIC_API_KEY`. The server also accepts `MYANTHROPIC_API_KEY`, `MY_ANTHROPIC_API_KEY`, or `CLAUDE_API_KEY` as aliases, but it does not fall back to Replit Anthropic integration variables. Generated app files are stored in the `project_files` database table linked to the project ID.
+
 ## Key Features
 
 - Describe an app idea → Claude generates complete code (all files)

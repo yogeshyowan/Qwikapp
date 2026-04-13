@@ -36,6 +36,8 @@ Rules:
 - Always include a Dockerfile that exposes port 3000
 - Make the app fully functional — no placeholders, no TODOs
 - Be concise: avoid unnecessary comments, long license headers, and verbose boilerplate
+- Keep the app compact enough to fit in a single response. Prefer fewer files with cohesive code over many small component files.
+- For React apps, prefer Vite and keep UI code in src/App.jsx plus src/App.css unless more files are truly necessary.
 - Return ONLY a JSON object with this structure:
 {
   "summary": "Brief description of what was built",
@@ -43,7 +45,49 @@ Rules:
     { "filename": "relative/path/file.ext", "language": "javascript", "content": "full file content here" }
   ]
 }
+- Do not wrap the JSON in markdown fences.
 - Do not include any text outside the JSON object`;
+
+function extractJsonObject(response: string): string {
+  const trimmed = response.trim();
+  const unfenced = trimmed
+    .replace(/^```(?:json)?\s*/i, "")
+    .replace(/\s*```$/i, "")
+    .trim();
+  const start = unfenced.indexOf("{");
+  const end = unfenced.lastIndexOf("}");
+
+  if (start === -1 || end === -1 || end <= start) {
+    throw new Error("No JSON object found in Claude response");
+  }
+
+  return unfenced.slice(start, end + 1);
+}
+
+function validateGenerationResult(value: unknown): GenerationResult {
+  if (!value || typeof value !== "object") {
+    throw new Error("Claude response was not an object");
+  }
+
+  const result = value as Partial<GenerationResult>;
+  if (typeof result.summary !== "string" || !Array.isArray(result.files)) {
+    throw new Error("Claude response did not include summary and files");
+  }
+
+  for (const file of result.files) {
+    if (
+      !file ||
+      typeof file !== "object" ||
+      typeof file.filename !== "string" ||
+      typeof file.language !== "string" ||
+      typeof file.content !== "string"
+    ) {
+      throw new Error("Claude response included an invalid file entry");
+    }
+  }
+
+  return result as GenerationResult;
+}
 
 export async function generateAppCode(
   title: string,
@@ -72,7 +116,7 @@ Keep file contents concise and production-ready. Return the complete JSON respon
 
   const stream = client.messages.stream({
     model: "claude-sonnet-4-6",
-    max_tokens: 8192,
+    max_tokens: 20000,
     system: SYSTEM_PROMPT,
     messages: [{ role: "user", content: userPrompt }],
   });
@@ -90,11 +134,7 @@ Keep file contents concise and production-ready. Return the complete JSON respon
   }
 
   try {
-    const jsonMatch = fullResponse.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) {
-      throw new Error("No JSON found in Claude response");
-    }
-    const parsed = JSON.parse(jsonMatch[0]) as GenerationResult;
+    const parsed = validateGenerationResult(JSON.parse(extractJsonObject(fullResponse)));
     logger.info(
       { fileCount: parsed.files.length },
       "Successfully parsed generated files"
@@ -117,7 +157,7 @@ export async function streamConversationResponse(
 
   const stream = client.messages.stream({
     model: "claude-sonnet-4-6",
-    max_tokens: 8192,
+    max_tokens: 20000,
     system: systemPrompt,
     messages,
   });
