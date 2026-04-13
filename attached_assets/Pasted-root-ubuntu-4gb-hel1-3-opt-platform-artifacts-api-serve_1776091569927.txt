@@ -1,0 +1,17 @@
+root@ubuntu-4gb-hel1-3:/opt/platform/artifacts/api-server# cat /etc/nginx/sites-enabled/default
+cat: /etc/nginx/sites-enabled/default: No such file or directory
+root@ubuntu-4gb-hel1-3:/opt/platform/artifacts/api-server# ls /etc/nginx/sites-enabled/
+ls: cannot access '/etc/nginx/sites-enabled/': No such file or directory
+root@ubuntu-4gb-hel1-3:/opt/platform/artifacts/api-server# ls /etc/nginx/conf.d/
+ls: cannot access '/etc/nginx/conf.d/': No such file or directory
+root@ubuntu-4gb-hel1-3:/opt/platform/artifacts/api-server# ss -tlnp | grep ':80'
+LISTEN 0      4096         0.0.0.0:80        0.0.0.0:*    users:(("docker-proxy",pid=1384,fd=8))
+LISTEN 0      4096            [::]:80           [::]:*    users:(("docker-proxy",pid=1402,fd=8))
+LISTEN 0      511                *:8080            *:*    users:(("node /opt/platf",pid=36978,fd=31))
+root@ubuntu-4gb-hel1-3:/opt/platform/artifacts/api-server# docker ps
+CONTAINER ID   IMAGE                COMMAND                  CREATED       STATUS                 PORTS                                                                                                                             NAMES
+7b27f51a88ac   caddy:2-alpine       "caddy run --config …"   4 hours ago   Up 2 hours             0.0.0.0:80->80/tcp, [::]:80->80/tcp, 0.0.0.0:443->443/tcp, [::]:443->443/tcp, 0.0.0.0:443->443/udp, [::]:443->443/udp, 2019/tcp   platform-caddy-1
+c2ecedf06e30   platform-api         "docker-entrypoint.s…"   4 hours ago   Up 2 hours             8080/tcp                                                                                                                          platform-api-1
+c0d7f4501517   postgres:16-alpine   "docker-entrypoint.s…"   4 hours ago   Up 2 hours (healthy)   5432/tcp                                                                                                                          platform-db-1
+d063d46b0257   platform-frontend    "/docker-entrypoint.…"   4 hours ago   Up 2 hours             80/tcp                                                                                                                            platform-frontend-1
+root@ubuntu-4gb-hel1-3:/opt/platform/artifacts/api-server#
