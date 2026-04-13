@@ -26,11 +26,10 @@ export interface GenerationResult {
 const SYSTEM_PROMPT = `You are an expert software engineer. When given an app idea and tech stack, you generate complete, production-ready code.
 
 Rules:
-- Generate ALL files needed for the app to run (including package.json, Dockerfile, etc.)
+- Generate ALL files needed for the app to run (package.json, source files, etc.)
 - Always include a Dockerfile that exposes port 3000
-- Always include a docker-compose.yml  
-- Always include a .github/workflows/deploy.yml for CI/CD (GitHub Actions)
 - Make the app fully functional — no placeholders, no TODOs
+- Be concise: avoid unnecessary comments, long license headers, and verbose boilerplate
 - Return ONLY a JSON object with this structure:
 {
   "summary": "Brief description of what was built",
@@ -57,13 +56,11 @@ Description: ${description}
 Tech Stack: ${techStack}
 
 Generate all files needed. Include:
-1. The complete application code
-2. A Dockerfile (expose port 3000)
-3. A docker-compose.yml
-4. A .github/workflows/deploy.yml for GitHub Actions CI/CD that SSH deploys to a server
-5. A README.md with setup and deployment instructions
+1. The complete application source code
+2. A package.json with all dependencies
+3. A Dockerfile (expose port 3000)
 
-Return the complete JSON response.`;
+Keep file contents concise and production-ready. Return the complete JSON response.`;
 
   let fullResponse = "";
 
