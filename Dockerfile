@@ -12,6 +12,7 @@ COPY lib/api-client-react/package.json ./lib/api-client-react/
 COPY lib/integrations-anthropic-ai/package.json ./lib/integrations-anthropic-ai/
 COPY artifacts/api-server/package.json ./artifacts/api-server/
 COPY artifacts/code-gen/package.json ./artifacts/code-gen/
+COPY scripts/package.json ./scripts/
 RUN pnpm install --frozen-lockfile
 
 FROM deps AS builder
@@ -19,6 +20,7 @@ COPY . .
 ENV BASE_PATH=/
 ENV PORT=3000
 ENV NODE_ENV=production
+ENV NODE_OPTIONS=--max-old-space-size=4096
 RUN pnpm --filter @workspace/api-server run build
 RUN pnpm --filter @workspace/code-gen run build
 
