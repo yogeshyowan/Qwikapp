@@ -2,7 +2,7 @@
 
 ## Overview
 
-A self-hostable developer platform where users describe an app idea, Claude generates complete production-ready code, and the platform deploys it instantly as a live URL. Built to run on your own Hetzner server.
+A self-hostable developer platform where users describe an app idea, Claude generates complete production-ready code, and the platform deploys it instantly as a live URL. Built to run on your own Hetzner server, and migrated to run in the Replit development environment without changing the core project structure.
 
 ## Stack
 
@@ -17,6 +17,15 @@ A self-hostable developer platform where users describe an app idea, Claude gene
 - **Validation**: Zod (`zod/v4`), `drizzle-zod`
 - **API codegen**: Orval (from OpenAPI spec)
 - **Build**: esbuild (CJS bundle)
+
+## Replit Runtime
+
+The project runs on Replit as two workflows:
+
+- `Start application` — starts the Vite frontend at `/` with `PORT=25494` and `BASE_PATH=/`.
+- `API Server` — builds and starts the Express API with `PORT=8080`, serving routes under `/api`.
+
+The Replit development PostgreSQL database is provisioned and the Drizzle schema has been pushed with `pnpm --filter @workspace/db run push`. Frontend and API traffic are kept separate by service path routing, with browser API requests going to `/api`.
 
 ## Key Features
 
