@@ -1,5 +1,5 @@
-FROM node:20-alpine AS base
-RUN npm install -g pnpm
+FROM node:24-alpine AS base
+RUN npm install -g pnpm@10
 WORKDIR /app
 
 FROM base AS deps
@@ -17,10 +17,10 @@ RUN pnpm install --frozen-lockfile
 FROM deps AS builder
 COPY . .
 RUN pnpm --filter @workspace/api-server run build
-RUN pnpm --filter @workspace/code-gen run build
+RUN BASE_PATH=/ PORT=3000 pnpm --filter @workspace/code-gen run build
 
-FROM node:20-alpine AS api
-RUN npm install -g pnpm
+FROM node:24-alpine AS api
+RUN npm install -g pnpm@10
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY --from=deps /app/artifacts/api-server/node_modules ./artifacts/api-server/node_modules
