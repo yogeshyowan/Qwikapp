@@ -146,6 +146,93 @@ Keep file contents concise and production-ready. Return the complete JSON respon
   }
 }
 
+export const LIVE_BUILD_SYSTEM = `You are a live app builder. Build a complete, self-contained HTML application progressively, emitting JSON action objects.
+
+OUTPUT RULES:
+- Output ONLY valid JSON objects, one per build part. No prose, no markdown, no text outside JSON.
+- Every JSON object must be complete and independently parseable.
+
+PROTOCOL:
+
+Step 1 — Optional: If requirements are genuinely ambiguous and you cannot make a reasonable assumption, ask ONE clarifying question:
+{"action":"ask","question":"Your question here","options":["Option A","Option B","Option C"]}
+Otherwise skip directly to building — do not ask unnecessary questions.
+
+Step 2 — Build in 3–5 progressive parts. Each action must include the FULL current HTML document:
+{"action":"build","part":"HTML Structure","progress":20,"html":"<!doctype html><html lang=\\"en\\">...</html>","message":"Created the basic page layout","done":false}
+{"action":"build","part":"Core Features","progress":55,"html":"<!doctype html><html lang=\\"en\\">...</html>","message":"Implemented the main functionality","done":false}
+{"action":"build","part":"Styling & Polish","progress":85,"html":"<!doctype html><html lang=\\"en\\">...</html>","message":"Added visual design and UX polish","done":false}
+{"action":"build","part":"Complete App","progress":100,"html":"<!doctype html><html lang=\\"en\\">...</html>","message":"App is fully complete","done":true}
+
+Step 3 — For modifications requested after the initial build:
+{"action":"modify","part":"What changed","progress":100,"html":"<!doctype html><html lang=\\"en\\">...</html>","message":"Description of what was modified","done":true}
+
+CRITICAL RULES:
+- Every build/modify action's "html" field MUST contain the COMPLETE HTML document from <!doctype html> to </html>
+- Each HTML snapshot must be a fully working, renderable page on its own
+- Embed all custom CSS in <style> tags; embed all custom JS in <script> tags
+- You MAY use CDN-hosted libraries via <script src="..."> — e.g. Tailwind, Chart.js, Alpine.js
+- Never use ES module syntax (import/export) in inline <script> tags
+- Build apps that are visually polished with modern styling
+- Make sensible design choices without asking — only ask if the core functionality is genuinely unclear`;
+
+/**
+ * Scans a streaming text buffer and extracts any complete top-level JSON objects.
+ * Handles strings containing braces and escape sequences correctly.
+ * Returns the parsed objects and the remaining unparsed buffer.
+ */
+export function extractCompleteJsonObjects(buffer: string): {
+  objects: unknown[];
+  remaining: string;
+} {
+  const objects: unknown[] = [];
+  let depth = 0;
+  let start = -1;
+  let inString = false;
+  let escape = false;
+  let lastEnd = 0;
+
+  for (let i = 0; i < buffer.length; i++) {
+    const ch = buffer[i];
+
+    if (escape) {
+      escape = false;
+      continue;
+    }
+    if (ch === "\\" && inString) {
+      escape = true;
+      continue;
+    }
+    if (ch === '"') {
+      inString = !inString;
+      continue;
+    }
+    if (inString) continue;
+
+    if (ch === "{") {
+      if (depth === 0) start = i;
+      depth++;
+    } else if (ch === "}" && depth > 0) {
+      depth--;
+      if (depth === 0 && start !== -1) {
+        const jsonStr = buffer.slice(start, i + 1);
+        try {
+          objects.push(JSON.parse(jsonStr));
+        } catch {
+          // Skip malformed object
+        }
+        lastEnd = i + 1;
+        start = -1;
+      }
+    }
+  }
+
+  // Keep any in-progress partial object; discard consumed content.
+  const remaining = start !== -1 ? buffer.slice(start) : "";
+  void lastEnd; // lastEnd used implicitly via start logic
+  return { objects, remaining };
+}
+
 export async function streamConversationResponse(
   messages: { role: "user" | "assistant"; content: string }[],
   systemPrompt: string,

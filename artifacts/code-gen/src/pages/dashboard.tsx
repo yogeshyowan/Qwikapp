@@ -1,102 +1,153 @@
 import { useGetProjectStats, useListProjects } from "@workspace/api-client-react";
 import { Link } from "wouter";
 import { format } from "date-fns";
-import { Terminal, Plus, Activity, Layers, FileCode2, Clock } from "lucide-react";
+import {
+  Activity,
+  Clock,
+  FileCode2,
+  Layers,
+  Plus,
+  Terminal,
+  Zap,
+} from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+
+function statusStyle(status: string) {
+  switch (status) {
+    case "done":
+      return "bg-emerald-500/10 text-emerald-400 border-emerald-500/30";
+    case "generating":
+      return "bg-yellow-500/10 text-yellow-400 border-yellow-500/30 animate-pulse";
+    case "error":
+      return "bg-red-500/10 text-red-400 border-red-500/30";
+    default:
+      return "bg-muted/30 text-muted-foreground border-border";
+  }
+}
 
 export default function Dashboard() {
   const { data: stats, isLoading: statsLoading } = useGetProjectStats();
   const { data: projects, isLoading: projectsLoading } = useListProjects();
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "done": return "bg-primary/20 text-primary border-primary/30";
-      case "generating": return "bg-yellow-500/20 text-yellow-500 border-yellow-500/30 animate-pulse";
-      case "error": return "bg-destructive/20 text-destructive border-destructive/30";
-      default: return "bg-muted text-muted-foreground border-border";
-    }
-  };
+  const statCards = [
+    { label: "Total Projects", value: stats?.totalProjects, icon: Layers },
+    { label: "Completed", value: stats?.completedProjects, icon: Activity },
+    { label: "Files Generated", value: stats?.totalFilesGenerated, icon: FileCode2 },
+  ];
 
   return (
-    <div className="space-y-8 max-w-6xl mx-auto">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight mb-2">Command Center</h1>
-        <p className="text-muted-foreground">Monitor your generated applications and deployments.</p>
+    <div className="max-w-5xl mx-auto space-y-8">
+
+      {/* Hero header */}
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">Projects</h1>
+          <p className="text-sm text-muted-foreground mt-1">
+            Build and deploy AI-generated applications instantly.
+          </p>
+        </div>
+        <Link href="/projects/new">
+          <Button size="sm" className="gap-2 shrink-0">
+            <Plus className="h-4 w-4" />
+            New Project
+          </Button>
+        </Link>
       </div>
 
-      {/* Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {[
-          { label: "Total Projects", value: stats?.totalProjects, icon: Layers, loading: statsLoading },
-          { label: "Completed", value: stats?.completedProjects, icon: Activity, loading: statsLoading },
-          { label: "Files Generated", value: stats?.totalFilesGenerated, icon: FileCode2, loading: statsLoading },
-        ].map((stat, i) => (
-          <div key={i} className="border border-border bg-card p-6 rounded-lg relative overflow-hidden group hover:border-primary/50 transition-colors">
-            <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
-              <stat.icon className="w-16 h-16 text-primary" />
+      {/* Stats row */}
+      <div className="grid grid-cols-3 gap-3">
+        {statCards.map((s, i) => (
+          <div
+            key={i}
+            className="bg-card border border-border/60 rounded-lg p-4 relative overflow-hidden group hover:border-border transition-colors"
+          >
+            <div className="absolute top-3 right-3 opacity-8 group-hover:opacity-15 transition-opacity">
+              <s.icon className="h-8 w-8 text-primary" />
             </div>
-            <div className="relative z-10">
-              <p className="text-sm text-muted-foreground font-medium mb-1 uppercase tracking-wider">{stat.label}</p>
-              {stat.loading ? (
-                <Skeleton className="h-10 w-24 bg-muted/50" />
-              ) : (
-                <p className="text-4xl font-bold text-foreground font-sans tracking-tight">{stat.value || 0}</p>
-              )}
-            </div>
+            <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">{s.label}</p>
+            {statsLoading ? (
+              <Skeleton className="h-8 w-16 bg-muted/30" />
+            ) : (
+              <p className="text-3xl font-bold tabular-nums">{s.value ?? 0}</p>
+            )}
           </div>
         ))}
       </div>
 
-      {/* Recent Projects */}
+      {/* Project grid */}
       <div>
-        <div className="flex items-center justify-between mb-6">
-          <h2 className="text-xl font-bold tracking-tight">Recent Deployments</h2>
-          <Link href="/projects/new" className="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground shadow hover:bg-primary/90 h-9 px-4 py-2 gap-2">
-            <Plus className="h-4 w-4" />
-            New Project
-          </Link>
-        </div>
+        <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-4">
+          Recent
+        </h2>
 
         {projectsLoading ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {[1, 2, 3, 4, 5, 6].map((i) => (
-              <Skeleton key={i} className="h-40 rounded-lg bg-card/50 border border-border" />
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            {Array(6).fill(0).map((_, i) => (
+              <Skeleton key={i} className="h-36 rounded-lg bg-card/50 border border-border/40" />
             ))}
           </div>
         ) : projects && projects.length > 0 ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
             {projects.map((project, i) => (
-              <Link key={project.id} href={`/projects/${project.id}`} className="block">
-                <div 
-                  className="border border-border bg-card hover:bg-accent/5 p-5 rounded-lg h-full flex flex-col transition-all hover:border-primary/40 duration-300 animate-in fade-in slide-in-from-bottom-4"
-                  style={{ animationDelay: `${i * 100}ms`, animationFillMode: "both" }}
+              <Link key={project.id} href={`/projects/${project.id}`}>
+                <div
+                  className="group bg-card border border-border/60 rounded-lg p-4 h-full flex flex-col gap-3 hover:border-primary/30 hover:bg-card/80 transition-all duration-200 cursor-pointer"
+                  style={{
+                    animationDelay: `${i * 50}ms`,
+                    animation: "fadeIn 0.3s ease both",
+                  }}
                 >
-                  <div className="flex justify-between items-start mb-4">
-                    <h3 className="font-bold text-lg truncate pr-2">{project.title}</h3>
-                    <Badge variant="outline" className={getStatusColor(project.status)}>
+                  {/* Title row */}
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <div className="h-7 w-7 rounded bg-primary/10 border border-primary/20 flex items-center justify-center shrink-0">
+                        <Terminal className="h-3.5 w-3.5 text-primary" />
+                      </div>
+                      <h3 className="font-semibold text-sm truncate">{project.title}</h3>
+                    </div>
+                    <Badge
+                      variant="outline"
+                      className={`text-[10px] px-1.5 h-5 shrink-0 ${statusStyle(project.status)}`}
+                    >
                       {project.status}
                     </Badge>
                   </div>
-                  <p className="text-sm text-muted-foreground line-clamp-2 mb-4 flex-1">
+
+                  {/* Description */}
+                  <p className="text-xs text-muted-foreground/70 line-clamp-2 leading-relaxed flex-1">
                     {project.description}
                   </p>
-                  <div className="flex items-center justify-between text-xs text-muted-foreground mt-auto pt-4 border-t border-border/50">
-                    <span className="bg-secondary px-2 py-1 rounded text-secondary-foreground">{project.techStack}</span>
-                    <span className="flex items-center gap-1"><Clock className="h-3 w-3" /> {format(new Date(project.createdAt), 'MMM d, yyyy')}</span>
+
+                  {/* Footer */}
+                  <div className="flex items-center justify-between pt-2 border-t border-border/40">
+                    <span className="text-[10px] font-mono bg-secondary/60 text-secondary-foreground px-1.5 py-0.5 rounded">
+                      {project.techStack}
+                    </span>
+                    <span className="text-[10px] text-muted-foreground/40 flex items-center gap-1">
+                      <Clock className="h-3 w-3" />
+                      {format(new Date(project.createdAt), "MMM d")}
+                    </span>
                   </div>
                 </div>
               </Link>
             ))}
           </div>
         ) : (
-          <div className="text-center py-16 border border-dashed border-border rounded-lg bg-card/30">
-            <Terminal className="h-12 w-12 mx-auto text-muted-foreground mb-4 opacity-50" />
-            <h3 className="text-lg font-medium mb-2">No projects yet</h3>
-            <p className="text-muted-foreground mb-4">Create your first AI-generated application to get started.</p>
-            <Link href="/projects/new" className="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring bg-primary text-primary-foreground shadow hover:bg-primary/90 h-9 px-4 py-2 gap-2">
-              <Plus className="h-4 w-4" />
-              Initialize Project
+          <div className="border border-dashed border-border/50 rounded-lg py-16 px-8 text-center">
+            <div className="inline-flex h-12 w-12 items-center justify-center rounded-full bg-primary/10 border border-primary/20 mb-4">
+              <Zap className="h-6 w-6 text-primary" />
+            </div>
+            <h3 className="font-semibold mb-1">No projects yet</h3>
+            <p className="text-sm text-muted-foreground mb-5">
+              Describe an app idea and Claude will build it for you.
+            </p>
+            <Link href="/projects/new">
+              <Button size="sm" className="gap-2">
+                <Plus className="h-4 w-4" />
+                Create first project
+              </Button>
             </Link>
           </div>
         )}

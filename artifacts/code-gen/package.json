@@ -73,5 +73,10 @@
     "vite": "catalog:",
     "wouter": "^3.3.5",
     "zod": "catalog:"
+  },
+  "dependencies": {
+    "@monaco-editor/react": "^4.7.0",
+    "jszip": "^3.10.1",
+    "monaco-editor": "^0.55.1"
   }
 }

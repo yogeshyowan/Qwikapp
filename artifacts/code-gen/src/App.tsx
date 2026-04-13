@@ -13,16 +13,23 @@ const queryClient = new QueryClient();
 
 function Router() {
   return (
-    <Layout>
-      <Switch>
-        <Route path="/" component={Dashboard} />
-        <Route path="/projects/new" component={NewProject} />
-        <Route path="/projects/:id" component={ProjectDetail} />
-        <Route path="/chat" component={Chat} />
-        <Route path="/chat/:id" component={Chat} />
-        <Route component={NotFound} />
-      </Switch>
-    </Layout>
+    <Switch>
+      {/* Project detail is full-screen IDE — no Layout wrapper */}
+      <Route path="/projects/:id" component={ProjectDetail} />
+
+      {/* All other routes use the sidebar Layout */}
+      <Route>
+        <Layout>
+          <Switch>
+            <Route path="/" component={Dashboard} />
+            <Route path="/projects/new" component={NewProject} />
+            <Route path="/chat" component={Chat} />
+            <Route path="/chat/:id" component={Chat} />
+            <Route component={NotFound} />
+          </Switch>
+        </Layout>
+      </Route>
+    </Switch>
   );
 }
 

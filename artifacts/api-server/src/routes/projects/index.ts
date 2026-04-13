@@ -1,13 +1,24 @@
 import { Router, type IRouter } from "express";
 import { eq, sql } from "drizzle-orm";
-import { db, projectsTable, projectFilesTable } from "@workspace/db";
+import {
+  db,
+  projectsTable,
+  projectFilesTable,
+  conversationsTable,
+  messagesTable,
+} from "@workspace/db";
 import {
   CreateProjectBody,
   GetProjectParams,
   DeleteProjectParams,
   ListProjectFilesParams,
 } from "@workspace/api-zod";
-import { generateAppCode } from "../../lib/codegen";
+import {
+  generateAppCode,
+  streamConversationResponse,
+  LIVE_BUILD_SYSTEM,
+  extractCompleteJsonObjects,
+} from "../../lib/codegen";
 import { buildAndRunApp, stopAndRemoveApp } from "../../lib/docker";
 import { logger } from "../../lib/logger";
 
@@ -305,6 +316,230 @@ router.post("/projects/:id/redeploy", async (req, res): Promise<void> => {
       .where(eq(projectsTable.id, id));
     res.status(500).json({ error: "Redeployment failed" });
   }
+});
+
+// ─── File CRUD ───────────────────────────────────────────────────────────────
+
+function detectLanguage(filename: string): string {
+  const ext = (filename.split(".").pop() ?? "").toLowerCase();
+  const map: Record<string, string> = {
+    ts: "typescript", tsx: "typescript",
+    js: "javascript", jsx: "javascript", mjs: "javascript",
+    py: "python", rb: "ruby", go: "go", rs: "rust",
+    java: "java", kt: "kotlin", swift: "swift",
+    c: "c", cpp: "cpp", h: "c", hpp: "cpp",
+    css: "css", scss: "scss", less: "less",
+    html: "html", htm: "html",
+    json: "json", yaml: "yaml", yml: "yaml", toml: "toml",
+    md: "markdown", txt: "text",
+    sh: "shell", bash: "shell", zsh: "shell",
+    dockerfile: "dockerfile", sql: "sql",
+    xml: "xml", svg: "xml",
+  };
+  if (filename.toLowerCase() === "dockerfile") return "dockerfile";
+  return map[ext] ?? "text";
+}
+
+router.post("/projects/:id/files", async (req, res): Promise<void> => {
+  const id = parseInt(
+    Array.isArray(req.params.id) ? req.params.id[0] : req.params.id,
+    10
+  );
+
+  const [project] = await db
+    .select()
+    .from(projectsTable)
+    .where(eq(projectsTable.id, id));
+
+  if (!project) {
+    res.status(404).json({ error: "Project not found" });
+    return;
+  }
+
+  const { filename, content = "" } = (req.body ?? {}) as {
+    filename?: string;
+    content?: string;
+  };
+
+  if (!filename || typeof filename !== "string") {
+    res.status(400).json({ error: "filename is required" });
+    return;
+  }
+
+  const [file] = await db
+    .insert(projectFilesTable)
+    .values({
+      projectId: id,
+      filename,
+      language: detectLanguage(filename),
+      content,
+    })
+    .returning();
+
+  res.status(201).json({ ...file, createdAt: file.createdAt.toISOString() });
+});
+
+router.put("/projects/:id/files/:fileId", async (req, res): Promise<void> => {
+  const fileId = parseInt(req.params.fileId, 10);
+  const { content } = (req.body ?? {}) as { content?: string };
+
+  if (typeof content !== "string") {
+    res.status(400).json({ error: "content is required" });
+    return;
+  }
+
+  await db
+    .update(projectFilesTable)
+    .set({ content })
+    .where(eq(projectFilesTable.id, fileId));
+
+  res.json({ success: true });
+});
+
+router.patch("/projects/:id/files/:fileId", async (req, res): Promise<void> => {
+  const fileId = parseInt(req.params.fileId, 10);
+  const { filename } = (req.body ?? {}) as { filename?: string };
+
+  if (!filename || typeof filename !== "string") {
+    res.status(400).json({ error: "filename is required" });
+    return;
+  }
+
+  const [file] = await db
+    .update(projectFilesTable)
+    .set({ filename, language: detectLanguage(filename) })
+    .where(eq(projectFilesTable.id, fileId))
+    .returning();
+
+  res.json({ ...file, createdAt: file.createdAt.toISOString() });
+});
+
+router.delete("/projects/:id/files/:fileId", async (req, res): Promise<void> => {
+  const fileId = parseInt(req.params.fileId, 10);
+  await db
+    .delete(projectFilesTable)
+    .where(eq(projectFilesTable.id, fileId));
+  res.sendStatus(204);
+});
+
+// ─── Live Builder ─────────────────────────────────────────────────────────────
+
+// Live interactive builder — POST to start a new build or continue with a user answer/modification
+router.post("/projects/:id/live-build", async (req, res): Promise<void> => {
+  const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+  const id = parseInt(raw, 10);
+
+  const [project] = await db
+    .select()
+    .from(projectsTable)
+    .where(eq(projectsTable.id, id));
+
+  if (!project) {
+    res.status(404).json({ error: "Project not found" });
+    return;
+  }
+
+  const { message, conversationId } = (req.body ?? {}) as {
+    message?: string;
+    conversationId?: string;
+  };
+
+  let convId: number;
+
+  if (conversationId) {
+    // Continue an existing builder conversation
+    convId = parseInt(conversationId, 10);
+    if (isNaN(convId)) {
+      res.status(400).json({ error: "Invalid conversationId" });
+      return;
+    }
+    if (message) {
+      await db.insert(messagesTable).values({
+        conversationId: convId,
+        role: "user",
+        content: message,
+      });
+    }
+  } else {
+    // Start a fresh builder conversation
+    const [conv] = await db
+      .insert(conversationsTable)
+      .values({ title: `Live Build: ${project.title}` })
+      .returning();
+    convId = conv.id;
+
+    const initialPrompt = `Build this app:\nTitle: ${project.title}\nDescription: ${project.description}\nTech Stack: ${project.techStack}`;
+    await db.insert(messagesTable).values({
+      conversationId: convId,
+      role: "user",
+      content: initialPrompt,
+    });
+  }
+
+  // Fetch full conversation history
+  const history = await db
+    .select()
+    .from(messagesTable)
+    .where(eq(messagesTable.conversationId, convId))
+    .orderBy(messagesTable.createdAt);
+
+  const chatMessages = history.map((m) => ({
+    role: m.role as "user" | "assistant",
+    content: m.content,
+  }));
+
+  res.setHeader("Content-Type", "text/event-stream");
+  res.setHeader("Cache-Control", "no-cache");
+  res.setHeader("Connection", "keep-alive");
+
+  // Tell the client which conversation to continue with
+  res.write(
+    `data: ${JSON.stringify({ type: "init", conversationId: String(convId) })}\n\n`
+  );
+
+  try {
+    let jsonBuffer = "";
+
+    const fullResponse = await streamConversationResponse(
+      chatMessages,
+      LIVE_BUILD_SYSTEM,
+      (chunk) => {
+        jsonBuffer += chunk;
+        const { objects, remaining } = extractCompleteJsonObjects(jsonBuffer);
+        jsonBuffer = remaining;
+
+        for (const action of objects) {
+          res.write(
+            `data: ${JSON.stringify({ type: "action", action })}\n\n`
+          );
+        }
+      }
+    );
+
+    // Flush any remaining buffer after stream ends
+    const { objects: finalObjects } = extractCompleteJsonObjects(jsonBuffer);
+    for (const action of finalObjects) {
+      res.write(
+        `data: ${JSON.stringify({ type: "action", action })}\n\n`
+      );
+    }
+
+    // Persist assistant reply
+    await db.insert(messagesTable).values({
+      conversationId: convId,
+      role: "assistant",
+      content: fullResponse,
+    });
+
+    res.write(`data: ${JSON.stringify({ type: "done" })}\n\n`);
+  } catch (err) {
+    logger.error({ err, projectId: id }, "Live build stream failed");
+    res.write(
+      `data: ${JSON.stringify({ type: "error", message: "Stream failed" })}\n\n`
+    );
+  }
+
+  res.end();
 });
 
 export default router;
