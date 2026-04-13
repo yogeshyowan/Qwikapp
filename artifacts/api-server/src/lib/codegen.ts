@@ -2,11 +2,17 @@ import Anthropic from "@anthropic-ai/sdk";
 import { logger } from "./logger";
 
 function getAnthropicClient(): Anthropic {
-  const apiKey = process.env.ANTHROPIC_API_KEY || process.env.MYANTHROPIC_API_KEY || process.env.AI_INTEGRATIONS_ANTHROPIC_API_KEY;
-  const baseURL = process.env.AI_INTEGRATIONS_ANTHROPIC_BASE_URL;
+  const apiKey =
+    process.env.ANTHROPIC_API_KEY ||
+    process.env.MYANTHROPIC_API_KEY ||
+    process.env.MY_ANTHROPIC_API_KEY ||
+    process.env.CLAUDE_API_KEY;
+  const baseURL = process.env.ANTHROPIC_BASE_URL;
 
   if (!apiKey) {
-    throw new Error("ANTHROPIC_API_KEY must be set");
+    throw new Error(
+      "Your Anthropic API key is missing. Add it as ANTHROPIC_API_KEY.",
+    );
   }
 
   return new Anthropic({ apiKey, ...(baseURL ? { baseURL } : {}) });

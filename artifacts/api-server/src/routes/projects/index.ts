@@ -238,7 +238,9 @@ router.post("/projects/:id/generate", async (req, res): Promise<void> => {
       .update(projectsTable)
       .set({ status: "error", updatedAt: new Date() })
       .where(eq(projectsTable.id, id));
-    res.write(`data: ${JSON.stringify({ type: "error", message: "Generation failed" })}\n\n`);
+    const message =
+      err instanceof Error ? err.message : "Generation failed unexpectedly";
+    res.write(`data: ${JSON.stringify({ type: "error", message })}\n\n`);
   }
 
   res.end();

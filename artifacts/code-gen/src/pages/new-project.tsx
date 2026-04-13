@@ -69,34 +69,41 @@ export default function NewProject() {
         
         for (const line of lines) {
           if (line.startsWith('data: ')) {
+            let data: { type?: string; content?: string; summary?: string; deployUrl?: string | null; fileCount?: number; message?: string };
             try {
-              const data = JSON.parse(line.slice(6));
-              if (data.type === 'chunk') {
-                setGenerationLogs(prev => {
-                  const newLogs = [...prev, `[WRITING] ${data.content.substring(0, 50).replace(/\n/g, '')}...`];
-                  return newLogs.slice(-15); // Keep last 15 lines
-                });
-              } else if (data.type === 'done') {
-                setGenerationLogs(prev => [...prev, "SUCCESS: Generation complete", `Deployed at: ${data.deployUrl}`]);
-                setTimeout(() => {
-                  setLocation(`/projects/${project.id}`);
-                }, 1500);
-                return;
-              } else if (data.type === 'error') {
-                throw new Error("Generation error");
-              }
+              data = JSON.parse(line.slice(6));
             } catch (e) {
               console.error(e);
+              throw new Error("Invalid generation stream response");
+            }
+
+            if (data.type === 'chunk') {
+              setGenerationLogs(prev => {
+                const newLogs = [...prev, `[WRITING] ${(data.content ?? "").substring(0, 50).replace(/\n/g, '')}...`];
+                return newLogs.slice(-15);
+              });
+            } else if (data.type === 'done') {
+              setGenerationLogs(prev => [...prev, "SUCCESS: Generation complete", data.deployUrl ? `Deployed at: ${data.deployUrl}` : "Files saved to project database"]);
+              setTimeout(() => {
+                setLocation(`/projects/${project.id}`);
+              }, 1500);
+              return;
+            } else if (data.type === 'error') {
+              throw new Error(data.message || "Generation error");
             }
           }
         }
       }
+
+      throw new Error("Generation stream ended before completion");
       
     } catch (error) {
       console.error(error);
+      const message = error instanceof Error ? error.message : "There was an error generating the project.";
+      setGenerationLogs(prev => [...prev, `ERROR: ${message}`]);
       toast({
         title: "Generation failed",
-        description: "There was an error generating the project.",
+        description: message,
         variant: "destructive",
       });
       setIsGenerating(false);
