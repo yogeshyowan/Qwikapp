@@ -7,7 +7,3 @@
         reverse_proxy frontend:80
     }
 }
-
-*.{$PLATFORM_DOMAIN} {
-    respond "No app deployed at this subdomain yet." 404
-}
