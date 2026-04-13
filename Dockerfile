@@ -1,4 +1,4 @@
-FROM node:24-alpine AS base
+FROM node:24-slim AS base
 RUN npm install -g pnpm@10
 WORKDIR /app
 
@@ -24,7 +24,7 @@ ENV NODE_OPTIONS=--max-old-space-size=4096
 RUN pnpm --filter @workspace/api-server run build
 RUN pnpm --filter @workspace/code-gen run build
 
-FROM node:24-alpine AS api
+FROM node:24-slim AS api
 RUN npm install -g pnpm@10
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
