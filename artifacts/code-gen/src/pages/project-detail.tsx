@@ -59,7 +59,12 @@ export default function ProjectDetail() {
     <div className="h-screen flex flex-col bg-background overflow-hidden">
       <TopBar project={project} onDownload={handleDownload} />
       <div className="flex-1 overflow-hidden">
-        <LiveBuilder projectId={projectId} project={project} initialHtml={initialHtml} />
+        <LiveBuilder
+          projectId={projectId}
+          project={project}
+          initialHtml={initialHtml}
+          files={(serverFiles ?? []) as ProjectFile[]}
+        />
       </div>
     </div>
   );

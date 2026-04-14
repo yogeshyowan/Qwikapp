@@ -3,8 +3,11 @@ import {
   CheckCircle2,
   Code2,
   ExternalLink,
+  FileText,
   Eye,
   Loader2,
+  Monitor,
+  PanelRight,
   RefreshCw,
   Send,
   Zap,
@@ -48,6 +51,12 @@ interface LiveBuilderProps {
   };
   /** Pre-loaded HTML from DB — shown immediately without triggering a new build */
   initialHtml?: string;
+  files?: {
+    id?: number;
+    filename: string;
+    language: string;
+    content: string;
+  }[];
 }
 
 const FALLBACK_OPTIONS = [
@@ -58,7 +67,7 @@ const FALLBACK_OPTIONS = [
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
-export function LiveBuilder({ projectId, project, initialHtml }: LiveBuilderProps) {
+export function LiveBuilder({ projectId, project, initialHtml, files = [] }: LiveBuilderProps) {
   const { toast } = useToast();
   const { refreshSubscription } = useAuth();
 
@@ -80,6 +89,7 @@ export function LiveBuilder({ projectId, project, initialHtml }: LiveBuilderProp
   const [deployUrl, setDeployUrl] = useState<string | null>(null);
 
   const [previewMode, setPreviewMode] = useState<"preview" | "code">("preview");
+  const [rightPanelMode, setRightPanelMode] = useState<"files" | "html">("files");
   const [modifyInput, setModifyInput] = useState("");
 
   // ── On mount: restore conversation ID and show cached state ─────────────
@@ -126,9 +136,10 @@ export function LiveBuilder({ projectId, project, initialHtml }: LiveBuilderProp
     let receivedDone = false;
 
     try {
-      const body: { message?: string; conversationId?: string } = {};
+      const body: { message?: string; conversationId?: string; currentHtml?: string } = {};
       if (userMessage) body.message = userMessage;
       if (convIdRef.current) body.conversationId = convIdRef.current;
+      if (userMessage && liveHtmlRef.current) body.currentHtml = liveHtmlRef.current;
 
       const token = getStoredToken();
       const resp = await fetch(`/api/projects/${projectId}/live-build`, {
@@ -299,13 +310,13 @@ export function LiveBuilder({ projectId, project, initialHtml }: LiveBuilderProp
   // ── Render ───────────────────────────────────────────────────────────────
 
   return (
-    <div className="flex h-full overflow-hidden bg-background">
+    <div className="flex h-full overflow-hidden bg-[#0b0c10]">
 
       {/* ── Left panel: conversation ──────────────────────────────────── */}
-      <div className="w-[38%] border-r border-border flex flex-col bg-sidebar min-w-0 shrink-0">
+      <div className="w-[360px] border-r border-border/70 flex flex-col bg-[#101116] min-w-0 shrink-0">
 
         {/* Header */}
-        <div className="px-4 py-3 border-b border-border bg-white flex items-center gap-2 shrink-0">
+        <div className="px-4 py-3 border-b border-border/70 bg-[#0d0e12] flex items-center gap-2 shrink-0">
           <Zap className="h-4 w-4 text-primary shrink-0" />
           <span className="text-xs font-bold tracking-widest text-primary uppercase">
             AI Builder
@@ -314,7 +325,7 @@ export function LiveBuilder({ projectId, project, initialHtml }: LiveBuilderProp
             {isBuilding && (
               <span className="text-xs text-muted-foreground font-mono flex items-center gap-1.5">
                 <Loader2 className="h-3 w-3 animate-spin" />
-                Building...
+                Building…
               </span>
             )}
             {isDone && !isBuilding && (
@@ -337,6 +348,9 @@ export function LiveBuilder({ projectId, project, initialHtml }: LiveBuilderProp
               <div className="space-y-1">
                 <p className="font-semibold text-foreground font-sans text-sm">{project.title}</p>
                 <p className="text-muted-foreground text-xs font-sans">{project.techStack}</p>
+                <p className="text-muted-foreground/70 text-xs font-sans max-w-[260px]">
+                  Describe the app, then keep refining it while the preview stays visible.
+                </p>
               </div>
               <Button
                 onClick={() => runBuild()}
@@ -375,7 +389,7 @@ export function LiveBuilder({ projectId, project, initialHtml }: LiveBuilderProp
                         key={j}
                         onClick={() => pendingQuestion && handleAnswerQuestion(opt)}
                         disabled={!pendingQuestion || isBuilding}
-                        className="text-left px-3 py-1.5 bg-white hover:bg-primary/5 border border-border hover:border-primary/40 rounded text-foreground hover:text-primary text-xs transition-colors disabled:opacity-40 disabled:cursor-not-allowed shadow-sm"
+                      className="text-left px-3 py-1.5 bg-[#151720] hover:bg-primary/10 border border-border/70 hover:border-primary/40 rounded text-foreground hover:text-primary text-xs transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                       >
                         {opt}
                       </button>
@@ -447,15 +461,21 @@ export function LiveBuilder({ projectId, project, initialHtml }: LiveBuilderProp
         {(isDone || isBuilding) && (
           <form
             onSubmit={handleModify}
-            className="p-3 border-t border-border bg-white shrink-0"
+            className="p-3 border-t border-border/70 bg-[#0d0e12] shrink-0"
           >
+            {liveHtml && (
+              <div className="mb-2 flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                <Monitor className="h-3 w-3 text-primary" />
+                The AI uses the current preview as context for each edit.
+              </div>
+            )}
             <div className="flex gap-2">
               <Input
                 value={modifyInput}
                 onChange={(e) => setModifyInput(e.target.value)}
                 placeholder={isBuilding ? "Building…" : "Or describe your own change…"}
                 disabled={isBuilding}
-                className="h-8 text-xs font-mono bg-background border-border focus-visible:ring-primary"
+                className="h-8 text-xs font-mono bg-[#151720] border-border/70 focus-visible:ring-primary"
               />
               <Button
                 type="submit"
@@ -470,12 +490,12 @@ export function LiveBuilder({ projectId, project, initialHtml }: LiveBuilderProp
         )}
       </div>
 
-      {/* ── Right panel: live preview ─────────────────────────────────── */}
-      <div className="flex-1 flex flex-col min-w-0 bg-background">
+      {/* ── Center panel: live preview ─────────────────────────────────── */}
+      <div className="flex-1 flex flex-col min-w-0 bg-[#11131a]">
 
         {/* Progress bar while building */}
         {!isDone && isBuilding && (
-          <div className="px-4 py-2.5 border-b border-border bg-sidebar shrink-0">
+          <div className="px-4 py-2.5 border-b border-border/70 bg-[#0d0e12] shrink-0">
             <div className="flex items-center justify-between mb-1.5 text-xs">
               <span className="text-muted-foreground font-mono truncate pr-4">
                 {progressPart || "Initializing…"}
@@ -488,9 +508,9 @@ export function LiveBuilder({ projectId, project, initialHtml }: LiveBuilderProp
 
         {/* Done banner — shows deploy URL + preview/code toggle */}
         {isDone && (
-          <div className="flex items-center gap-3 px-4 py-2 bg-emerald-50 border-b border-emerald-200 shrink-0">
+          <div className="flex items-center gap-3 px-4 py-2 bg-[#0d0e12] border-b border-border/70 shrink-0">
             <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500 shrink-0" />
-            <span className="text-xs font-semibold text-emerald-700">Preview ready</span>
+            <span className="text-xs font-semibold text-emerald-400">Preview ready</span>
 
             {deployUrl && (
               <a
@@ -504,7 +524,7 @@ export function LiveBuilder({ projectId, project, initialHtml }: LiveBuilderProp
               </a>
             )}
 
-            <div className="ml-auto flex items-center gap-1 bg-white border border-border rounded p-0.5">
+            <div className="ml-auto flex items-center gap-1 bg-[#151720] border border-border/70 rounded p-0.5">
               <button
                 onClick={() => setPreviewMode("preview")}
                 className={`flex items-center gap-1 px-2 py-1 rounded text-[11px] transition-colors ${
@@ -532,7 +552,8 @@ export function LiveBuilder({ projectId, project, initialHtml }: LiveBuilderProp
         )}
 
         {/* Content */}
-        <div className="flex-1 overflow-hidden relative">
+        <div className="flex-1 overflow-hidden relative p-3">
+          <div className="h-full overflow-hidden rounded-lg border border-border/70 bg-white shadow-2xl">
           {liveHtml ? (
             previewMode === "preview" ? (
               <iframe
@@ -550,7 +571,7 @@ export function LiveBuilder({ projectId, project, initialHtml }: LiveBuilderProp
               </ScrollArea>
             )
           ) : (
-            <div className="h-full flex flex-col items-center justify-center text-muted-foreground/40 gap-3">
+            <div className="h-full flex flex-col items-center justify-center text-muted-foreground/40 gap-3 bg-[#0d0e12]">
               {isBuilding ? (
                 <>
                   <Loader2 className="h-10 w-10 animate-spin" />
@@ -564,7 +585,88 @@ export function LiveBuilder({ projectId, project, initialHtml }: LiveBuilderProp
               )}
             </div>
           )}
+          </div>
         </div>
+      </div>
+
+      <div className="w-[300px] border-l border-border/70 bg-[#0d0e12] flex flex-col shrink-0 min-w-0">
+        <div className="px-3 py-3 border-b border-border/70 flex items-center gap-2 shrink-0">
+          <PanelRight className="h-4 w-4 text-muted-foreground" />
+          <span className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
+            Tools & Files
+          </span>
+        </div>
+
+        <div className="flex items-center gap-1 p-2 border-b border-border/70 shrink-0">
+          <button
+            onClick={() => setRightPanelMode("files")}
+            className={`flex-1 flex items-center justify-center gap-1.5 rounded px-2 py-1.5 text-[11px] transition-colors ${
+              rightPanelMode === "files"
+                ? "bg-primary/20 text-primary"
+                : "text-muted-foreground hover:bg-white/5 hover:text-foreground"
+            }`}
+          >
+            <FileText className="h-3 w-3" />
+            Files
+          </button>
+          <button
+            onClick={() => setRightPanelMode("html")}
+            className={`flex-1 flex items-center justify-center gap-1.5 rounded px-2 py-1.5 text-[11px] transition-colors ${
+              rightPanelMode === "html"
+                ? "bg-primary/20 text-primary"
+                : "text-muted-foreground hover:bg-white/5 hover:text-foreground"
+            }`}
+          >
+            <Code2 className="h-3 w-3" />
+            Live HTML
+          </button>
+        </div>
+
+        {rightPanelMode === "files" ? (
+          <ScrollArea className="flex-1">
+            <div className="p-3 space-y-2">
+              {files.length === 0 && !liveHtml && (
+                <div className="rounded-lg border border-dashed border-border/70 p-4 text-center text-xs text-muted-foreground">
+                  Generated project files will appear here.
+                </div>
+              )}
+              {liveHtml && !files.some((file) => file.filename === "_preview.html") && (
+                <div className="rounded-md border border-primary/30 bg-primary/5 p-2.5">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <FileText className="h-3.5 w-3.5 text-primary shrink-0" />
+                    <span className="truncate text-xs font-mono text-foreground">_preview.html</span>
+                  </div>
+                  <div className="mt-1 text-[11px] text-muted-foreground font-mono">
+                    {(liveHtml.length / 1024).toFixed(1)} KB · current preview
+                  </div>
+                </div>
+              )}
+              {files.map((file) => (
+                <div key={file.id ?? file.filename} className="rounded-md border border-border/60 bg-[#151720] p-2.5">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <FileText className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                    <span className="truncate text-xs font-mono text-foreground">{file.filename}</span>
+                  </div>
+                  <div className="mt-1 text-[11px] text-muted-foreground font-mono">
+                    {file.language} · {(file.content.length / 1024).toFixed(1)} KB
+                  </div>
+                </div>
+              ))}
+            </div>
+          </ScrollArea>
+        ) : (
+          <ScrollArea className="flex-1">
+            {liveHtml ? (
+              <pre className="p-3 text-[11px] font-mono leading-relaxed whitespace-pre-wrap break-all text-muted-foreground">
+                {liveHtml}
+              </pre>
+            ) : (
+              <div className="h-full min-h-[240px] flex items-center justify-center p-4 text-center text-xs text-muted-foreground">
+                Start a build to inspect the generated HTML.
+              </div>
+            )}
+          </ScrollArea>
+        )}
       </div>
     </div>
   );

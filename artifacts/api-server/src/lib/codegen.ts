@@ -178,7 +178,9 @@ CRITICAL RULES:
 - You MAY use CDN-hosted libraries via <script src="..."> (Tailwind, Chart.js, Alpine.js, etc.)
 - Never use ES module syntax (import/export) in inline <script> tags
 - Make suggestions specific to what was actually built — not generic
-- Build apps that are visually polished with modern styling`;
+- Build apps that are visually polished with modern styling
+- When modifying an existing app, preserve the current interface and behavior unless the user explicitly asks to replace it
+- If the user message includes current preview HTML, treat it as the exact interface state the user is seeing and update that complete document`;
 
 /**
  * Scans a streaming text buffer and extracts any complete top-level JSON objects.

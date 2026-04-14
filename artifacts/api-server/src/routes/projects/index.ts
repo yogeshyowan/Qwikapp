@@ -462,9 +462,10 @@ router.post("/projects/:id/live-build", requireAuth, async (req, res): Promise<v
     return;
   }
 
-  const { message, conversationId } = (req.body ?? {}) as {
+  const { message, conversationId, currentHtml } = (req.body ?? {}) as {
     message?: string;
     conversationId?: string;
+    currentHtml?: string;
   };
 
   let convId: number;
@@ -507,6 +508,16 @@ router.post("/projects/:id/live-build", requireAuth, async (req, res): Promise<v
     role: m.role as "user" | "assistant",
     content: m.content,
   }));
+
+  if (message && typeof currentHtml === "string" && currentHtml.trim() && chatMessages.length > 0) {
+    const currentHtmlContext = currentHtml.length > 45000
+      ? `${currentHtml.slice(0, 45000)}\n\n[HTML truncated to fit context]`
+      : currentHtml;
+    const lastMessage = chatMessages[chatMessages.length - 1];
+    if (lastMessage.role === "user") {
+      lastMessage.content = `${message}\n\nCurrent preview HTML, representing the interface the user is looking at right now:\n${currentHtmlContext}`;
+    }
+  }
 
   res.setHeader("Content-Type", "text/event-stream");
   res.setHeader("Cache-Control", "no-cache");
