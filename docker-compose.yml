@@ -24,6 +24,8 @@ services:
     build:
       context: .
       target: frontend
+      args:
+        - VITE_GOOGLE_CLIENT_ID=${VITE_GOOGLE_CLIENT_ID}
     restart: unless-stopped
     networks:
       - platform
@@ -41,6 +43,10 @@ services:
       - MYANTHROPIC_API_KEY=${MYANTHROPIC_API_KEY}
       - PLATFORM_DOMAIN=${PLATFORM_DOMAIN}
       - SESSION_SECRET=${SESSION_SECRET}
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
+      - JWT_SECRET=${JWT_SECRET}
+      - RAZORPAY_KEY_ID=${RAZORPAY_KEY_ID}
+      - RAZORPAY_KEY_SECRET=${RAZORPAY_KEY_SECRET}
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
     networks:

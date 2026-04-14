@@ -17,13 +17,13 @@ import { Button } from "@/components/ui/button";
 function statusStyle(status: string) {
   switch (status) {
     case "done":
-      return "bg-emerald-500/10 text-emerald-400 border-emerald-500/30";
+      return "bg-emerald-50 text-emerald-700 border-emerald-200";
     case "generating":
-      return "bg-yellow-500/10 text-yellow-400 border-yellow-500/30 animate-pulse";
+      return "bg-yellow-50 text-yellow-700 border-yellow-200 animate-pulse";
     case "error":
-      return "bg-red-500/10 text-red-400 border-red-500/30";
+      return "bg-red-50 text-red-700 border-red-200";
     default:
-      return "bg-muted/30 text-muted-foreground border-border";
+      return "bg-muted text-muted-foreground border-border";
   }
 }
 

@@ -21,6 +21,8 @@ ENV BASE_PATH=/
 ENV PORT=3000
 ENV NODE_ENV=production
 ENV NODE_OPTIONS=--max-old-space-size=4096
+ARG VITE_GOOGLE_CLIENT_ID
+ENV VITE_GOOGLE_CLIENT_ID=$VITE_GOOGLE_CLIENT_ID
 RUN pnpm --filter @workspace/api-server run build
 RUN pnpm --filter @workspace/code-gen run build
 

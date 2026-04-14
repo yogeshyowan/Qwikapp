@@ -1,11 +1,13 @@
 import { Router, type IRouter } from "express";
-import { eq, sql } from "drizzle-orm";
+import { eq, sql, and } from "drizzle-orm";
 import {
   db,
   projectsTable,
   projectFilesTable,
   conversationsTable,
   messagesTable,
+  subscriptionsTable,
+  tokenUsageTable,
 } from "@workspace/db";
 import {
   CreateProjectBody,
@@ -21,6 +23,12 @@ import {
 } from "../../lib/codegen";
 import { buildAndRunApp, stopAndRemoveApp } from "../../lib/docker";
 import { logger } from "../../lib/logger";
+import { requireAuth } from "../../middlewares/auth";
+
+// Cost constants (microdollars per token, Claude Sonnet 4.6)
+const INPUT_COST_MICRODOLLARS_PER_TOKEN = 3;   // $3 / million = 3 µ$/token
+const OUTPUT_COST_MICRODOLLARS_PER_TOKEN = 15;  // $15 / million = 15 µ$/token
+const USER_MARKUP = 2; // user charged 2× our Claude cost
 
 const router: IRouter = Router();
 
@@ -424,10 +432,11 @@ router.delete("/projects/:id/files/:fileId", async (req, res): Promise<void> => 
 
 // ─── Live Builder ─────────────────────────────────────────────────────────────
 
-// Live interactive builder — POST to start a new build or continue with a user answer/modification
-router.post("/projects/:id/live-build", async (req, res): Promise<void> => {
+// Live interactive builder — requires auth, checks credit, tracks token usage
+router.post("/projects/:id/live-build", requireAuth, async (req, res): Promise<void> => {
   const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
   const id = parseInt(raw, 10);
+  const userId = req.user!.userId;
 
   const [project] = await db
     .select()
@@ -439,6 +448,20 @@ router.post("/projects/:id/live-build", async (req, res): Promise<void> => {
     return;
   }
 
+  // Check user has sufficient credit
+  const [sub] = await db
+    .select()
+    .from(subscriptionsTable)
+    .where(eq(subscriptionsTable.userId, userId));
+
+  if (!sub || sub.creditMicrodollars <= 0) {
+    res.status(402).json({
+      error: "Insufficient credit. Please upgrade your plan.",
+      code: "INSUFFICIENT_CREDIT",
+    });
+    return;
+  }
+
   const { message, conversationId } = (req.body ?? {}) as {
     message?: string;
     conversationId?: string;
@@ -447,7 +470,6 @@ router.post("/projects/:id/live-build", async (req, res): Promise<void> => {
   let convId: number;
 
   if (conversationId) {
-    // Continue an existing builder conversation
     convId = parseInt(conversationId, 10);
     if (isNaN(convId)) {
       res.status(400).json({ error: "Invalid conversationId" });
@@ -461,7 +483,6 @@ router.post("/projects/:id/live-build", async (req, res): Promise<void> => {
       });
     }
   } else {
-    // Start a fresh builder conversation
     const [conv] = await db
       .insert(conversationsTable)
       .values({ title: `Live Build: ${project.title}` })
@@ -476,7 +497,6 @@ router.post("/projects/:id/live-build", async (req, res): Promise<void> => {
     });
   }
 
-  // Fetch full conversation history
   const history = await db
     .select()
     .from(messagesTable)
@@ -492,15 +512,17 @@ router.post("/projects/:id/live-build", async (req, res): Promise<void> => {
   res.setHeader("Cache-Control", "no-cache");
   res.setHeader("Connection", "keep-alive");
 
-  // Tell the client which conversation to continue with
   res.write(
     `data: ${JSON.stringify({ type: "init", conversationId: String(convId) })}\n\n`
   );
 
   try {
     let jsonBuffer = "";
+    let lastHtml = "";
 
-    const fullResponse = await streamConversationResponse(
+    const liveBuildTokens = conversationId ? 3000 : 6000;
+
+    const streamResult = await streamConversationResponse(
       chatMessages,
       LIVE_BUILD_SYSTEM,
       (chunk) => {
@@ -509,16 +531,21 @@ router.post("/projects/:id/live-build", async (req, res): Promise<void> => {
         jsonBuffer = remaining;
 
         for (const action of objects) {
+          const a = action as Record<string, unknown>;
+          if (typeof a.html === "string") lastHtml = a.html;
           res.write(
             `data: ${JSON.stringify({ type: "action", action })}\n\n`
           );
         }
-      }
+      },
+      liveBuildTokens
     );
 
-    // Flush any remaining buffer after stream ends
+    // Flush remaining buffer
     const { objects: finalObjects } = extractCompleteJsonObjects(jsonBuffer);
     for (const action of finalObjects) {
+      const a = action as Record<string, unknown>;
+      if (typeof a.html === "string") lastHtml = a.html;
       res.write(
         `data: ${JSON.stringify({ type: "action", action })}\n\n`
       );
@@ -528,10 +555,77 @@ router.post("/projects/:id/live-build", async (req, res): Promise<void> => {
     await db.insert(messagesTable).values({
       conversationId: convId,
       role: "assistant",
-      content: fullResponse,
+      content: streamResult.text,
     });
 
-    res.write(`data: ${JSON.stringify({ type: "done" })}\n\n`);
+    // ── Token usage & billing ────────────────────────────────────────────
+    const { inputTokens, outputTokens } = streamResult;
+    const claudeCostMicrodollars =
+      inputTokens * INPUT_COST_MICRODOLLARS_PER_TOKEN +
+      outputTokens * OUTPUT_COST_MICRODOLLARS_PER_TOKEN;
+    const userChargeMicrodollars = claudeCostMicrodollars * USER_MARKUP;
+
+    const description = conversationId ? `Modify: ${project.title}` : `Build: ${project.title}`;
+
+    await db.insert(tokenUsageTable).values({
+      userId,
+      projectId: id,
+      inputTokens,
+      outputTokens,
+      claudeCostMicrodollars,
+      userChargeMicrodollars,
+      description,
+    });
+
+    // Deduct from subscription (floor at 0)
+    const newCredit = Math.max(0, sub.creditMicrodollars - userChargeMicrodollars);
+    await db
+      .update(subscriptionsTable)
+      .set({ creditMicrodollars: newCredit, updatedAt: new Date() })
+      .where(eq(subscriptionsTable.userId, userId));
+
+    // Save / update preview HTML
+    if (lastHtml) {
+      const [existing] = await db
+        .select({ id: projectFilesTable.id })
+        .from(projectFilesTable)
+        .where(
+          and(
+            eq(projectFilesTable.projectId, id),
+            eq(projectFilesTable.filename, "_preview.html")
+          )
+        );
+
+      if (existing) {
+        await db
+          .update(projectFilesTable)
+          .set({ content: lastHtml })
+          .where(eq(projectFilesTable.id, existing.id));
+      } else {
+        await db.insert(projectFilesTable).values({
+          projectId: id,
+          filename: "_preview.html",
+          language: "html",
+          content: lastHtml,
+        });
+      }
+    }
+
+    const domain = process.env.PLATFORM_DOMAIN;
+    const deployUrl = domain ? `https://app-${id}.${domain}` : null;
+
+    res.write(
+      `data: ${JSON.stringify({
+        type: "done",
+        deployUrl,
+        usage: {
+          inputTokens,
+          outputTokens,
+          chargedUsd: (userChargeMicrodollars / 1_000_000).toFixed(4),
+          remainingCreditUsd: (newCredit / 1_000_000).toFixed(4),
+        },
+      })}\n\n`
+    );
   } catch (err) {
     logger.error({ err, projectId: id }, "Live build stream failed");
     res.write(

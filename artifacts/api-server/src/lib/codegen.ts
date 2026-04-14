@@ -116,7 +116,7 @@ Keep file contents concise and production-ready. Return the complete JSON respon
 
   const stream = client.messages.stream({
     model: "claude-sonnet-4-6",
-    max_tokens: 20000,
+    max_tokens: 12000,
     system: SYSTEM_PROMPT,
     messages: [{ role: "user", content: userPrompt }],
   });
@@ -149,32 +149,36 @@ Keep file contents concise and production-ready. Return the complete JSON respon
 export const LIVE_BUILD_SYSTEM = `You are a live app builder. Build a complete, self-contained HTML application progressively, emitting JSON action objects.
 
 OUTPUT RULES:
-- Output ONLY valid JSON objects, one per build part. No prose, no markdown, no text outside JSON.
+- Output ONLY valid JSON objects, one per action. No prose, no markdown, no text outside JSON.
 - Every JSON object must be complete and independently parseable.
 
-PROTOCOL:
+BUILD PROTOCOL:
 
-Step 1 — Optional: If requirements are genuinely ambiguous and you cannot make a reasonable assumption, ask ONE clarifying question:
-{"action":"ask","question":"Your question here","options":["Option A","Option B","Option C"]}
-Otherwise skip directly to building — do not ask unnecessary questions.
+Step 1 — Build immediately. Never ask questions before building. Make sensible design choices.
+Emit 3–4 progressive build actions, each with the FULL current HTML document:
+{"action":"build","part":"Structure","progress":25,"html":"<!doctype html><html lang=\\"en\\">...</html>","message":"Created the basic layout","done":false}
+{"action":"build","part":"Core Features","progress":65,"html":"<!doctype html><html lang=\\"en\\">...</html>","message":"Implemented main functionality","done":false}
+{"action":"build","part":"Complete App","progress":100,"html":"<!doctype html><html lang=\\"en\\">...</html>","message":"Working app ready","done":true}
 
-Step 2 — Build in 3–5 progressive parts. Each action must include the FULL current HTML document:
-{"action":"build","part":"HTML Structure","progress":20,"html":"<!doctype html><html lang=\\"en\\">...</html>","message":"Created the basic page layout","done":false}
-{"action":"build","part":"Core Features","progress":55,"html":"<!doctype html><html lang=\\"en\\">...</html>","message":"Implemented the main functionality","done":false}
-{"action":"build","part":"Styling & Polish","progress":85,"html":"<!doctype html><html lang=\\"en\\">...</html>","message":"Added visual design and UX polish","done":false}
-{"action":"build","part":"Complete App","progress":100,"html":"<!doctype html><html lang=\\"en\\">...</html>","message":"App is fully complete","done":true}
+Step 2 — Immediately after the final build action (done:true), emit ONE ask action with 3 specific enhancement suggestions tailored to what was just built:
+{"action":"ask","question":"Your app is ready! What would you like to add next?","options":["Specific feature A","Specific feature B","Specific feature C"]}
 
-Step 3 — For modifications requested after the initial build:
-{"action":"modify","part":"What changed","progress":100,"html":"<!doctype html><html lang=\\"en\\">...</html>","message":"Description of what was modified","done":true}
+MODIFICATION PROTOCOL (when user requests a change or picks a suggestion):
+Emit a single modify action with the complete updated HTML:
+{"action":"modify","part":"What changed","progress":100,"html":"<!doctype html><html lang=\\"en\\">...</html>","message":"Description of the change","done":true}
+
+Immediately after each modify action, emit another ask with 3 fresh suggestions relevant to the current state of the app:
+{"action":"ask","question":"What would you like to improve next?","options":["Option A","Option B","Option C"]}
 
 CRITICAL RULES:
+- NEVER ask questions before building — always build first
 - Every build/modify action's "html" field MUST contain the COMPLETE HTML document from <!doctype html> to </html>
 - Each HTML snapshot must be a fully working, renderable page on its own
-- Embed all custom CSS in <style> tags; embed all custom JS in <script> tags
-- You MAY use CDN-hosted libraries via <script src="..."> — e.g. Tailwind, Chart.js, Alpine.js
+- Embed all CSS in <style> tags; embed all JS in <script> tags
+- You MAY use CDN-hosted libraries via <script src="..."> (Tailwind, Chart.js, Alpine.js, etc.)
 - Never use ES module syntax (import/export) in inline <script> tags
-- Build apps that are visually polished with modern styling
-- Make sensible design choices without asking — only ask if the core functionality is genuinely unclear`;
+- Make suggestions specific to what was actually built — not generic
+- Build apps that are visually polished with modern styling`;
 
 /**
  * Scans a streaming text buffer and extracts any complete top-level JSON objects.
@@ -233,18 +237,27 @@ export function extractCompleteJsonObjects(buffer: string): {
   return { objects, remaining };
 }
 
+export interface StreamResult {
+  text: string;
+  inputTokens: number;
+  outputTokens: number;
+}
+
 export async function streamConversationResponse(
   messages: { role: "user" | "assistant"; content: string }[],
   systemPrompt: string,
-  onChunk: (chunk: string) => void
-): Promise<string> {
+  onChunk: (chunk: string) => void,
+  maxTokens = 2048
+): Promise<StreamResult> {
   const client = getAnthropicClient();
 
   let fullResponse = "";
+  let inputTokens = 0;
+  let outputTokens = 0;
 
   const stream = client.messages.stream({
     model: "claude-sonnet-4-6",
-    max_tokens: 20000,
+    max_tokens: maxTokens,
     system: systemPrompt,
     messages,
   });
@@ -257,7 +270,13 @@ export async function streamConversationResponse(
       fullResponse += event.delta.text;
       onChunk(event.delta.text);
     }
+    if (event.type === "message_delta" && event.usage) {
+      outputTokens = event.usage.output_tokens ?? 0;
+    }
+    if (event.type === "message_start" && event.message.usage) {
+      inputTokens = event.message.usage.input_tokens ?? 0;
+    }
   }
 
-  return fullResponse;
+  return { text: fullResponse, inputTokens, outputTokens };
 }

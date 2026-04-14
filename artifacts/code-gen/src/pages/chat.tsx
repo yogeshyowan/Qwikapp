@@ -18,7 +18,7 @@ export default function Chat() {
 
   const [activeConvId, setActiveConvId] = useState<string | null>(null);
   const { data: activeConv, isLoading: activeConvLoading } = useGetConversation(activeConvId || "", {
-    query: { enabled: !!activeConvId }
+    query: { queryKey: getListConversationsQueryKey(), enabled: !!activeConvId }
   });
 
   // Chat State
@@ -167,45 +167,45 @@ export default function Chat() {
       </div>
 
       {/* Chat Area */}
-      <div className="flex-1 flex flex-col bg-[#050505]">
-        <div className="p-4 border-b border-border/40 bg-sidebar/30 flex items-center gap-3">
+      <div className="flex-1 flex flex-col bg-background">
+        <div className="p-4 border-b border-border bg-sidebar flex items-center gap-3">
           <Terminal className="h-5 w-5 text-primary" />
           <div>
-            <h2 className="font-bold text-sm tracking-widest text-primary uppercase">SYSTEM TERMINAL</h2>
+            <h2 className="font-bold text-sm tracking-widest text-primary uppercase">AI Assistant</h2>
             <p className="text-xs text-muted-foreground font-mono">ID: {activeConvId || 'AWAITING_INIT'}</p>
           </div>
         </div>
 
-        <div 
+        <div
           ref={chatScrollRef}
-          className="flex-1 overflow-auto p-6 space-y-6 font-mono text-sm"
+          className="flex-1 overflow-auto p-6 space-y-6 text-sm"
         >
           {activeConvLoading ? (
             <div className="flex items-center gap-3 text-muted-foreground">
-              <Loader2 className="h-4 w-4 animate-spin" /> 
-              <span>Retrieving logs...</span>
+              <Loader2 className="h-4 w-4 animate-spin" />
+              <span>Loading messages...</span>
             </div>
           ) : messages.length === 0 ? (
-            <div className="h-full flex flex-col items-center justify-center text-muted-foreground opacity-50">
+            <div className="h-full flex flex-col items-center justify-center text-muted-foreground/50">
               <Terminal className="h-16 w-16 mb-4" />
-              <p className="text-lg">System ready for input.</p>
+              <p className="text-lg">Ask anything about your code.</p>
             </div>
           ) : (
             messages.map((msg, i) => (
-              <div key={i} className={`flex gap-4 ${msg.role === 'user' ? 'text-primary' : 'text-gray-300'}`}>
-                <span className="text-muted-foreground/50 select-none w-4 shrink-0 font-bold">
+              <div key={i} className={`flex gap-4 ${msg.role === 'user' ? 'text-primary' : 'text-foreground'}`}>
+                <span className="text-muted-foreground select-none w-4 shrink-0 font-bold font-mono">
                   {msg.role === 'user' ? '>' : '$'}
                 </span>
-                <div className="prose prose-invert max-w-none prose-pre:bg-[#111] prose-pre:border prose-pre:border-border prose-p:leading-relaxed">
+                <div className="prose prose-sm max-w-none prose-pre:bg-gray-100 prose-pre:border prose-pre:border-border prose-p:leading-relaxed">
                   {msg.content.split('```').map((block, idx) => {
-                    if (idx % 2 === 1) { // It's a code block
+                    if (idx % 2 === 1) {
                       const lines = block.split('\n');
                       const lang = lines[0];
                       const code = lines.slice(1).join('\n');
                       return (
-                        <div key={idx} className="my-4 rounded-md overflow-hidden border border-border/50">
-                          <div className="bg-sidebar px-4 py-1.5 text-xs text-muted-foreground border-b border-border/50 uppercase tracking-wider">{lang || 'text'}</div>
-                          <pre className="p-4 text-sm font-mono m-0 bg-[#0a0a0a] text-gray-300 overflow-x-auto">
+                        <div key={idx} className="my-4 rounded-md overflow-hidden border border-border">
+                          <div className="bg-sidebar px-4 py-1.5 text-xs text-muted-foreground border-b border-border uppercase tracking-wider font-mono">{lang || 'text'}</div>
+                          <pre className="p-4 text-sm font-mono m-0 bg-gray-50 text-gray-800 overflow-x-auto">
                             <code>{code}</code>
                           </pre>
                         </div>
@@ -217,29 +217,29 @@ export default function Chat() {
               </div>
             ))
           )}
-          
+
           {isSending && (
-            <div className="flex gap-4 text-gray-300">
-              <span className="text-muted-foreground/50 select-none w-4 shrink-0 font-bold">$</span>
+            <div className="flex gap-4 text-foreground">
+              <span className="text-muted-foreground select-none w-4 shrink-0 font-bold font-mono">$</span>
               <span className="inline-block w-2.5 h-5 bg-primary animate-pulse" />
             </div>
           )}
         </div>
 
-        <form onSubmit={handleSendMessage} className="p-4 border-t border-border/40 bg-sidebar/30">
+        <form onSubmit={handleSendMessage} className="p-4 border-t border-border bg-sidebar">
           <div className="flex gap-3 max-w-4xl mx-auto">
             <div className="relative flex-1 flex items-center">
               <span className="absolute left-4 text-primary font-bold">{'>'}</span>
-              <Input 
+              <Input
                 value={chatInput}
                 onChange={e => setChatInput(e.target.value)}
-                placeholder="Type command or query..." 
-                className="font-mono bg-[#0a0a0a] border-border focus-visible:ring-primary pl-8 h-12 text-base"
+                placeholder="Ask about your code..."
+                className="bg-background border-border focus-visible:ring-primary pl-8 h-12 text-base"
                 disabled={isSending}
                 autoFocus
               />
             </div>
-            <Button type="submit" disabled={!chatInput.trim() || isSending} className="shrink-0 w-12 h-12 px-0 bg-primary hover:bg-primary/90">
+            <Button type="submit" disabled={!chatInput.trim() || isSending} className="shrink-0 w-12 h-12 px-0">
               {isSending ? <Loader2 className="h-5 w-5 animate-spin" /> : <Send className="h-5 w-5" />}
             </Button>
           </div>
