@@ -31,6 +31,8 @@ AI generation uses the user's own Anthropic key from Replit Secrets via `ANTHROP
 
 The API startup migration creates the required app tables idempotently: `users`, `subscriptions`, `projects`, `project_files`, `conversations`, `messages`, and `token_usage`.
 
+Sensitive runtime values should be stored in Replit Secrets rather than normal environment variables. `JWT_SECRET` is intentionally not hardcoded in `.replit`; add it as a secret before using login/session flows.
+
 Generated project detail pages use a Replit-like live builder workspace: left AI conversation panel, center sandboxed live preview, and right tools/files panel. The live builder stores `_preview.html` in the database and sends the current preview HTML as context for follow-up edit requests so Claude can modify the interface the user is looking at.
 
 ## Key Features

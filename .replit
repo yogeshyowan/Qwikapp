@@ -76,4 +76,3 @@ channel = "stable-25_05"
 [userenv.shared]
 GOOGLE_CLIENT_ID = "464015322034-acv0ms9e19g0s2cbnvcbegs7ff8biiht.apps.googleusercontent.com"
 VITE_GOOGLE_CLIENT_ID = "464015322034-acv0ms9e19g0s2cbnvcbegs7ff8biiht.apps.googleusercontent.com"
-JWT_SECRET = "222b26fa175a7bb29fed64203075576c86653478526ab7435db53682bdabe6792c1498ab73718b589df9d171d6369c0c29d310a7bc40dedbffe1d7adf0b7c9b4"
