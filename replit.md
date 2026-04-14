@@ -79,5 +79,7 @@ docker compose up -d
 For Hetzner deployment (fill in `.env`):
 - `PLATFORM_DOMAIN` — your domain (e.g. myplatform.com)
 - `ANTHROPIC_API_KEY` — from console.anthropic.com
+- `GOOGLE_CLIENT_ID` and `VITE_GOOGLE_CLIENT_ID` — Google OAuth client ID used by backend token verification and frontend Google sign-in
+- `JWT_SECRET` — random server-side secret for issuing app login tokens after Google sign-in
 - `POSTGRES_PASSWORD` — strong DB password
 - `SESSION_SECRET` — random secret (openssl rand -hex 32)
