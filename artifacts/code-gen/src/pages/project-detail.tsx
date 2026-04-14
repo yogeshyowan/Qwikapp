@@ -1,4 +1,4 @@
-import { useCallback } from "react";
+import { useCallback, useState } from "react";
 import { useParams } from "wouter";
 import { useGetProject, useListProjectFiles } from "@workspace/api-client-react";
 import { Loader2 } from "lucide-react";
@@ -24,6 +24,8 @@ export default function ProjectDetail() {
   const { id } = useParams<{ id: string }>();
   const projectId = parseInt(id ?? "0", 10);
   const { toast } = useToast();
+  const [publishTrigger, setPublishTrigger] = useState(0);
+  const [isPublishing, setIsPublishing] = useState(false);
 
   const { data: project, isLoading } = useGetProject(projectId);
   const { data: serverFiles, isLoading: filesLoading } = useListProjectFiles(projectId);
@@ -57,13 +59,20 @@ export default function ProjectDetail() {
 
   return (
     <div className="h-screen flex flex-col bg-background overflow-hidden">
-      <TopBar project={project} onDownload={handleDownload} />
+      <TopBar
+        project={project}
+        onDownload={handleDownload}
+        onPublish={() => setPublishTrigger((value) => value + 1)}
+        isPublishing={isPublishing}
+      />
       <div className="flex-1 overflow-hidden">
         <LiveBuilder
           projectId={projectId}
           project={project}
           initialHtml={initialHtml}
           files={(serverFiles ?? []) as ProjectFile[]}
+          publishTrigger={publishTrigger}
+          onPublishingChange={setIsPublishing}
         />
       </div>
     </div>

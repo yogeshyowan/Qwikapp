@@ -9,7 +9,9 @@ import {
   Monitor,
   PanelRight,
   RefreshCw,
+  Rocket,
   Send,
+  ShieldCheck,
   Zap,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -42,6 +44,13 @@ type BuildAction = {
   done?: boolean;
 };
 
+type PublishStage = {
+  id: string;
+  label: string;
+  status: "pending" | "running" | "done" | "error";
+  message: string;
+};
+
 interface LiveBuilderProps {
   projectId: number;
   project: {
@@ -57,6 +66,8 @@ interface LiveBuilderProps {
     language: string;
     content: string;
   }[];
+  publishTrigger?: number;
+  onPublishingChange?: (isPublishing: boolean) => void;
 }
 
 const FALLBACK_OPTIONS = [
@@ -67,7 +78,14 @@ const FALLBACK_OPTIONS = [
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
-export function LiveBuilder({ projectId, project, initialHtml, files = [] }: LiveBuilderProps) {
+export function LiveBuilder({
+  projectId,
+  project,
+  initialHtml,
+  files = [],
+  publishTrigger = 0,
+  onPublishingChange,
+}: LiveBuilderProps) {
   const { toast } = useToast();
   const { refreshSubscription } = useAuth();
 
@@ -87,6 +105,13 @@ export function LiveBuilder({ projectId, project, initialHtml, files = [] }: Liv
     options: string[];
   } | null>(null);
   const [deployUrl, setDeployUrl] = useState<string | null>(null);
+  const [publishedUrl, setPublishedUrl] = useState<string | null>(null);
+  const [isPublishing, setIsPublishing] = useState(false);
+  const [publishStages, setPublishStages] = useState<PublishStage[]>([
+    { id: "publish-bundle", label: "Publish bundle", status: "pending", message: "Waiting" },
+    { id: "security-bundle", label: "Security bundle", status: "pending", message: "Waiting" },
+    { id: "promote-all", label: "Promote all", status: "pending", message: "Waiting" },
+  ]);
 
   const [previewMode, setPreviewMode] = useState<"preview" | "code">("preview");
   const [rightPanelMode, setRightPanelMode] = useState<"files" | "html">("files");
@@ -118,6 +143,15 @@ export function LiveBuilder({ projectId, project, initialHtml, files = [] }: Liv
       logScrollRef.current.scrollTop = logScrollRef.current.scrollHeight;
     }
   }, [eventLog]);
+
+  useEffect(() => {
+    onPublishingChange?.(isPublishing);
+  }, [isPublishing, onPublishingChange]);
+
+  useEffect(() => {
+    if (publishTrigger > 0) void runPublish();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [publishTrigger]);
 
   // ── Core streaming function ──────────────────────────────────────────────
 
@@ -305,6 +339,89 @@ export function LiveBuilder({ projectId, project, initialHtml, files = [] }: Liv
     if (!msg || isBuilding) return;
     setModifyInput("");
     await runBuild(msg);
+  };
+
+  const updatePublishStage = (id: string, patch: Partial<PublishStage>) => {
+    setPublishStages((prev) =>
+      prev.map((stage) => (stage.id === id ? { ...stage, ...patch } : stage))
+    );
+  };
+
+  const resetPublishStages = () => {
+    setPublishStages([
+      { id: "publish-bundle", label: "Publish bundle", status: "pending", message: "Waiting" },
+      { id: "security-bundle", label: "Security bundle", status: "pending", message: "Waiting" },
+      { id: "promote-all", label: "Promote all", status: "pending", message: "Waiting" },
+    ]);
+  };
+
+  const runPublish = async () => {
+    if (isPublishing) return;
+    if (!liveHtmlRef.current && !initialHtml) {
+      toast({
+        title: "Build before publishing",
+        description: "Create a sandbox preview first, then publish it.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsPublishing(true);
+    resetPublishStages();
+
+    try {
+      const token = getStoredToken();
+      const resp = await fetch(`/api/projects/${projectId}/publish`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ currentHtml: liveHtmlRef.current || initialHtml || "" }),
+      });
+
+      if (!resp.ok) throw new Error(`Publish failed: HTTP ${resp.status}`);
+      if (!resp.body) throw new Error("No publish response body");
+
+      const reader = resp.body.getReader();
+      const decoder = new TextDecoder();
+      let sseBuffer = "";
+
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        sseBuffer += decoder.decode(value, { stream: true });
+        const frames = sseBuffer.split("\n\n");
+        sseBuffer = frames.pop() ?? "";
+
+        for (const frame of frames) {
+          if (!frame.startsWith("data: ")) continue;
+          const data = JSON.parse(frame.slice(6)) as {
+            type: "stage" | "done" | "error";
+            stage?: PublishStage;
+            publishedUrl?: string;
+            message?: string;
+          };
+
+          if (data.type === "stage" && data.stage) {
+            updatePublishStage(data.stage.id, data.stage);
+          } else if (data.type === "done" && data.publishedUrl) {
+            setPublishedUrl(data.publishedUrl);
+            toast({
+              title: "Published",
+              description: data.publishedUrl,
+            });
+          } else if (data.type === "error") {
+            throw new Error(data.message ?? "Publish failed");
+          }
+        }
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Publish failed";
+      toast({ title: "Publish failed", description: message, variant: "destructive" });
+    } finally {
+      setIsPublishing(false);
+    }
   };
 
   // ── Render ───────────────────────────────────────────────────────────────
@@ -524,7 +641,29 @@ export function LiveBuilder({ projectId, project, initialHtml, files = [] }: Liv
               </a>
             )}
 
-            <div className="ml-auto flex items-center gap-1 bg-[#151720] border border-border/70 rounded p-0.5">
+            {publishedUrl && (
+              <a
+                href={publishedUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-1 text-xs text-emerald-400 hover:underline font-mono ml-1"
+              >
+                <ExternalLink className="h-3 w-3" />
+                Published
+              </a>
+            )}
+
+            <Button
+              size="sm"
+              onClick={runPublish}
+              disabled={isPublishing}
+              className="ml-auto h-7 gap-1.5 px-3 text-xs"
+            >
+              <Rocket className="h-3.5 w-3.5" />
+              {isPublishing ? "Publishing…" : "Publish"}
+            </Button>
+
+            <div className="flex items-center gap-1 bg-[#151720] border border-border/70 rounded p-0.5">
               <button
                 onClick={() => setPreviewMode("preview")}
                 className={`flex items-center gap-1 px-2 py-1 rounded text-[11px] transition-colors ${
@@ -620,6 +759,44 @@ export function LiveBuilder({ projectId, project, initialHtml, files = [] }: Liv
             <Code2 className="h-3 w-3" />
             Live HTML
           </button>
+        </div>
+
+        <div className="border-b border-border/70 p-3 space-y-2">
+          <div className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-widest text-muted-foreground">
+            <ShieldCheck className="h-3.5 w-3.5" />
+            Publish workflow
+          </div>
+          <div className="space-y-1.5">
+            {publishStages.map((stage) => (
+              <div key={stage.id} className="flex items-center gap-2 rounded-md border border-border/60 bg-[#151720] px-2.5 py-2">
+                <span
+                  className={`h-2 w-2 rounded-full ${
+                    stage.status === "done"
+                      ? "bg-emerald-400"
+                      : stage.status === "running"
+                        ? "bg-yellow-400 animate-pulse"
+                        : stage.status === "error"
+                          ? "bg-red-400"
+                          : "bg-muted-foreground/40"
+                  }`}
+                />
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-[11px] text-foreground">{stage.label}</p>
+                  <p className="truncate text-[10px] text-muted-foreground">{stage.message}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+          {publishedUrl && (
+            <a
+              href={publishedUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="block truncate rounded-md border border-emerald-400/30 bg-emerald-400/10 px-2.5 py-2 text-[11px] font-mono text-emerald-300 hover:underline"
+            >
+              {publishedUrl}
+            </a>
+          )}
         </div>
 
         {rightPanelMode === "files" ? (

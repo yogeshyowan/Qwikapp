@@ -68,6 +68,10 @@ externalPort = 80
 localPort = 25494
 externalPort = 3000
 
+[[ports]]
+localPort = 25495
+externalPort = 3001
+
 [nix]
 channel = "stable-25_05"
 
@@ -76,3 +80,4 @@ channel = "stable-25_05"
 [userenv.shared]
 GOOGLE_CLIENT_ID = "464015322034-acv0ms9e19g0s2cbnvcbegs7ff8biiht.apps.googleusercontent.com"
 VITE_GOOGLE_CLIENT_ID = "464015322034-acv0ms9e19g0s2cbnvcbegs7ff8biiht.apps.googleusercontent.com"
+PLATFORM_DOMAIN = "qwikorder.site"

@@ -6,12 +6,14 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider, useAuth } from "@/contexts/auth-context";
 import NotFound from "@/pages/not-found";
 import { Layout } from "@/components/layout";
+import Landing from "@/pages/landing";
 import Dashboard from "@/pages/dashboard";
 import NewProject from "@/pages/new-project";
 import ProjectDetail from "@/pages/project-detail";
 import Chat from "@/pages/chat";
 import Login from "@/pages/login";
 import Billing from "@/pages/billing";
+import SandboxPreview from "@/pages/sandbox-preview";
 import { Loader2 } from "lucide-react";
 
 const queryClient = new QueryClient();
@@ -44,9 +46,17 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 function Router() {
   return (
     <Switch>
+      <Route path="/">
+        <Landing />
+      </Route>
+
       {/* Public auth route */}
       <Route path="/login">
         <Login />
+      </Route>
+
+      <Route path="/sandbox/:id">
+        <SandboxPreview />
       </Route>
 
       {/* /projects/new must come before /projects/:id */}
@@ -68,7 +78,7 @@ function Router() {
         <ProtectedRoute>
           <Layout>
             <Switch>
-              <Route path="/" component={Dashboard} />
+              <Route path="/dashboard" component={Dashboard} />
               <Route path="/chat" component={Chat} />
               <Route path="/chat/:id" component={Chat} />
               <Route path="/billing" component={Billing} />

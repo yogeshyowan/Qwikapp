@@ -1,5 +1,5 @@
 import { useLocation } from "wouter";
-import { ArrowLeft, Download, Terminal } from "lucide-react";
+import { ArrowLeft, Download, Rocket, Terminal } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -12,9 +12,11 @@ interface TopBarProps {
     status: string;
   };
   onDownload: () => void;
+  onPublish?: () => void;
+  isPublishing?: boolean;
 }
 
-export function TopBar({ project, onDownload }: TopBarProps) {
+export function TopBar({ project, onDownload, onPublish, isPublishing }: TopBarProps) {
   const [, setLocation] = useLocation();
 
   const statusColor =
@@ -63,6 +65,18 @@ export function TopBar({ project, onDownload }: TopBarProps) {
       </div>
 
       <div className="flex-1" />
+
+      {onPublish && (
+        <Button
+          size="sm"
+          onClick={onPublish}
+          disabled={isPublishing}
+          className="h-7 gap-1.5 px-3 text-xs"
+        >
+          <Rocket className="h-3.5 w-3.5" />
+          {isPublishing ? "Publishing…" : "Publish"}
+        </Button>
+      )}
 
       <Tooltip delayDuration={300}>
         <TooltipTrigger asChild>

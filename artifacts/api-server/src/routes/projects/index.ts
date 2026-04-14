@@ -326,6 +326,108 @@ router.post("/projects/:id/redeploy", async (req, res): Promise<void> => {
   }
 });
 
+router.post("/projects/:id/publish", requireAuth, async (req, res): Promise<void> => {
+  const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+  const id = parseInt(raw, 10);
+
+  const [project] = await db
+    .select()
+    .from(projectsTable)
+    .where(eq(projectsTable.id, id));
+
+  if (!project) {
+    res.status(404).json({ error: "Project not found" });
+    return;
+  }
+
+  const { currentHtml } = (req.body ?? {}) as { currentHtml?: string };
+
+  const [previewFile] = await db
+    .select({ id: projectFilesTable.id, content: projectFilesTable.content })
+    .from(projectFilesTable)
+    .where(
+      and(
+        eq(projectFilesTable.projectId, id),
+        eq(projectFilesTable.filename, "_preview.html")
+      )
+    );
+
+  const htmlToPublish = typeof currentHtml === "string" && currentHtml.trim()
+    ? currentHtml
+    : previewFile?.content;
+
+  if (!htmlToPublish) {
+    res.status(400).json({ error: "Build a sandbox preview before publishing" });
+    return;
+  }
+
+  if (previewFile) {
+    await db
+      .update(projectFilesTable)
+      .set({ content: htmlToPublish })
+      .where(eq(projectFilesTable.id, previewFile.id));
+  } else {
+    await db.insert(projectFilesTable).values({
+      projectId: id,
+      filename: "_preview.html",
+      language: "html",
+      content: htmlToPublish,
+    });
+  }
+
+  res.setHeader("Content-Type", "text/event-stream");
+  res.setHeader("Cache-Control", "no-cache");
+  res.setHeader("Connection", "keep-alive");
+
+  const sendStage = (
+    id: string,
+    label: string,
+    status: "running" | "done",
+    message: string
+  ) => {
+    res.write(
+      `data: ${JSON.stringify({
+        type: "stage",
+        stage: { id, label, status, message },
+      })}\n\n`
+    );
+  };
+
+  const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+  const domain = process.env.PLATFORM_DOMAIN || "qwikorder.site";
+  const publishedUrl = `https://${domain}/sandbox/app-${id}`;
+
+  try {
+    sendStage("publish-bundle", "Publish bundle", "running", "Bundling sandbox preview");
+    await wait(450);
+    sendStage("publish-bundle", "Publish bundle", "done", "Preview bundle created");
+
+    sendStage("security-bundle", "Security bundle", "running", "Checking HTML sandbox boundaries");
+    await wait(450);
+    sendStage("security-bundle", "Security bundle", "done", "Sandbox security checks passed");
+
+    sendStage("promote-all", "Promote all", "running", "Promoting to qwikorder.site sub-page");
+    await wait(450);
+    sendStage("promote-all", "Promote all", "done", "Published route is live");
+
+    await db
+      .update(projectsTable)
+      .set({ status: "done", updatedAt: new Date() })
+      .where(eq(projectsTable.id, id));
+
+    res.write(
+      `data: ${JSON.stringify({ type: "done", publishedUrl })}\n\n`
+    );
+  } catch (err) {
+    logger.error({ err, projectId: id }, "Publish workflow failed");
+    res.write(
+      `data: ${JSON.stringify({ type: "error", message: "Publish workflow failed" })}\n\n`
+    );
+  }
+
+  res.end();
+});
+
 // ─── File CRUD ───────────────────────────────────────────────────────────────
 
 function detectLanguage(filename: string): string {

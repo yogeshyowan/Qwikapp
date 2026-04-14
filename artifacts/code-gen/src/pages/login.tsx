@@ -32,11 +32,12 @@ export default function Login() {
   const [error, setError] = useState<string | null>(null);
   const [signing, setSigning] = useState(false);
   const btnRef = useRef<HTMLDivElement>(null);
+  const nextPath = new URLSearchParams(window.location.search).get("next") || "/dashboard";
 
-  // If already authenticated, redirect home
+  // If already authenticated, redirect to the requested app route.
   useEffect(() => {
-    if (!isLoading && user) navigate("/");
-  }, [isLoading, user, navigate]);
+    if (!isLoading && user) navigate(nextPath);
+  }, [isLoading, user, navigate, nextPath]);
 
   // Mount Google button once GSI script is ready
   useEffect(() => {
@@ -52,7 +53,7 @@ export default function Login() {
             setError(null);
             try {
               await login(credential);
-              navigate("/");
+              navigate(nextPath);
             } catch {
               setError("Sign-in failed. Please try again.");
             } finally {
@@ -85,7 +86,7 @@ export default function Login() {
             <Terminal className="h-7 w-7 text-primary" />
           </div>
           <h1 className="text-2xl font-bold text-foreground tracking-tight">
-            Welcome to QwikIDE
+            Welcome to QwikOrder
           </h1>
           <p className="text-sm text-muted-foreground">
             Sign in to start building AI-powered apps
@@ -94,28 +95,6 @@ export default function Login() {
 
         {/* Card */}
         <div className="bg-white border border-border rounded-2xl p-8 shadow-sm space-y-6">
-          {/* Plans preview */}
-          <div className="space-y-2.5">
-            {[
-              { name: "Free", desc: "$1 token credit to get started" },
-              { name: "Standard", desc: "₹499/mo · $5 credit + pay-as-you-go" },
-              { name: "Pro", desc: "₹999/mo · $10 credit + pay-as-you-go" },
-            ].map((plan) => (
-              <div
-                key={plan.name}
-                className="flex items-center gap-3 text-sm text-muted-foreground"
-              >
-                <div className="h-1.5 w-1.5 rounded-full bg-primary shrink-0" />
-                <span>
-                  <span className="font-semibold text-foreground">{plan.name}</span>{" "}
-                  — {plan.desc}
-                </span>
-              </div>
-            ))}
-          </div>
-
-          <div className="border-t border-border" />
-
           {/* Google button */}
           <div className="flex flex-col items-center gap-3">
             {!CLIENT_ID && (

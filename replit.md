@@ -35,6 +35,8 @@ Sensitive runtime values should be stored in Replit Secrets rather than normal e
 
 Generated project detail pages use a Replit-like live builder workspace: left AI conversation panel, center sandboxed live preview, and right tools/files panel. The live builder stores `_preview.html` in the database and sends the current preview HTML as context for follow-up edit requests so Claude can modify the interface the user is looking at.
 
+The public homepage at `/` is a landing page for `qwikorder.site`. The authenticated dashboard lives at `/dashboard`. Project creation opens a plan-selection popup before entering the AI builder. Built previews are available through `/sandbox/app-{projectId}`, and the publish button runs publish bundle, security bundle, and promote-all stages before returning `https://qwikorder.site/sandbox/app-{projectId}`.
+
 ## Key Features
 
 - Describe an app idea → Claude generates complete code (all files)

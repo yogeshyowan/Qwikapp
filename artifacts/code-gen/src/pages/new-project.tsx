@@ -12,6 +12,13 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
+import {
+  type PlanId,
+  getRememberedPlan,
+  PlanSelectionDialog,
+  PLANS,
+  rememberSelectedPlan,
+} from "@/components/plan-selection-dialog";
 
 const formSchema = z.object({
   title: z.string().min(2, "Title must be at least 2 characters."),
@@ -26,8 +33,8 @@ export default function NewProject() {
   const createProject = useCreateProject();
   const zipInputRef = useRef<HTMLInputElement | null>(null);
   
-  const [isGenerating, setIsGenerating] = useState(false);
-  const [generationLogs, setGenerationLogs] = useState<string[]>([]);
+  const [plansOpen, setPlansOpen] = useState(() => !getRememberedPlan());
+  const [selectedPlan, setSelectedPlan] = useState<PlanId | null>(() => getRememberedPlan());
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -37,6 +44,12 @@ export default function NewProject() {
       techStack: "Web App",
     },
   });
+
+  const handleSelectPlan = (planId: PlanId) => {
+    rememberSelectedPlan(planId);
+    setSelectedPlan(planId);
+    setPlansOpen(false);
+  };
 
   const handleGithubImport = () => {
     toast({
@@ -54,118 +67,56 @@ export default function NewProject() {
   };
 
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
+    if (!selectedPlan) {
+      setPlansOpen(true);
+      return;
+    }
+
     try {
-      setIsGenerating(true);
-      setGenerationLogs(["Initializing generation protocol...", `Project type: ${values.techStack}`, "Booting AI assistant..."]);
-      
       const project = await createProject.mutateAsync({ data: values });
-      
       queryClient.invalidateQueries({ queryKey: getListProjectsQueryKey() });
-      
-      // Start SSE stream
-      setGenerationLogs(prev => [...prev, `Project created with ID: ${project.id}`, "Awaiting code generation stream..."]);
-      
-      const response = await fetch(`/api/projects/${project.id}/generate`, {
-        method: "POST",
-      });
-
-      if (!response.body) throw new Error("No response body");
-
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder();
-      
-      let buffer = "";
-      while (true) {
-        const { value, done } = await reader.read();
-        if (done) break;
-        
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split('\n\n');
-        buffer = lines.pop() || "";
-        
-        for (const line of lines) {
-          if (line.startsWith('data: ')) {
-            let data: { type?: string; content?: string; summary?: string; deployUrl?: string | null; fileCount?: number; message?: string };
-            try {
-              data = JSON.parse(line.slice(6));
-            } catch (e) {
-              console.error(e);
-              throw new Error("Invalid generation stream response");
-            }
-
-            if (data.type === 'chunk') {
-              setGenerationLogs(prev => {
-                const newLogs = [...prev, `[WRITING] ${(data.content ?? "").substring(0, 50).replace(/\n/g, '')}...`];
-                return newLogs.slice(-15);
-              });
-            } else if (data.type === 'done') {
-              setGenerationLogs(prev => [...prev, "SUCCESS: Generation complete", data.deployUrl ? `Deployed at: ${data.deployUrl}` : "Files saved to project database"]);
-              setTimeout(() => {
-                setLocation(`/projects/${project.id}`);
-              }, 1500);
-              return;
-            } else if (data.type === 'error') {
-              throw new Error(data.message || "Generation error");
-            }
-          }
-        }
-      }
-
-      throw new Error("Generation stream ended before completion");
-      
+      setLocation(`/projects/${project.id}`);
     } catch (error) {
       console.error(error);
-      const message = error instanceof Error ? error.message : "There was an error generating the project.";
-      setGenerationLogs(prev => [...prev, `ERROR: ${message}`]);
+      const message = error instanceof Error ? error.message : "There was an error creating the project.";
       toast({
-        title: "Generation failed",
+        title: "Project creation failed",
         description: message,
         variant: "destructive",
       });
-      setIsGenerating(false);
     }
   };
 
-  if (isGenerating) {
-    return (
-      <div className="fixed inset-0 z-50 bg-background flex flex-col">
-        <div className="flex items-center gap-3 p-6 border-b border-border bg-sidebar">
-          <Terminal className="h-6 w-6 text-primary animate-pulse" />
-          <div>
-            <h2 className="font-bold text-lg text-primary uppercase tracking-widest">Generating System</h2>
-            <p className="text-xs text-muted-foreground">Do not close this window</p>
-          </div>
-        </div>
-        <div className="flex-1 bg-[#0a0a0a] p-6 font-mono text-sm overflow-auto text-green-400/80 leading-relaxed shadow-inner">
-          <div className="max-w-4xl mx-auto space-y-1">
-            {generationLogs.map((log, i) => (
-              <div key={i} className="flex gap-4">
-                <span className="text-muted-foreground/50 select-none w-16 inline-block text-right">
-                  {String(i + 1).padStart(4, '0')}
-                </span>
-                <span className="whitespace-pre-wrap break-all">{log}</span>
-              </div>
-            ))}
-            <div className="flex gap-4 items-center mt-4">
-              <span className="text-muted-foreground/50 select-none w-16 inline-block text-right">
-                {String(generationLogs.length + 1).padStart(4, '0')}
-              </span>
-              <span className="inline-block w-2 h-4 bg-primary animate-pulse" />
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
+  const selectedPlanDetails = PLANS.find((plan) => plan.id === selectedPlan);
 
   return (
     <div className="max-w-2xl mx-auto mt-8">
+      <PlanSelectionDialog
+        open={plansOpen}
+        onOpenChange={setPlansOpen}
+        onSelectPlan={handleSelectPlan}
+        title="Select a plan before creating your project"
+        description="The payment/plan step appears only when project creation is triggered."
+      />
+
       <div className="mb-8">
         <h1 className="text-3xl font-bold tracking-tight mb-2">Create Project</h1>
-        <p className="text-muted-foreground">Describe your app idea, and Claude will generate the code and deploy it.</p>
+        <p className="text-muted-foreground">Describe your app idea, then continue into the conversational AI builder.</p>
       </div>
 
       <div className="border border-border bg-card rounded-lg p-6 shadow-sm">
+        <div className="mb-6 flex items-center justify-between gap-3 rounded-lg border border-primary/20 bg-primary/5 px-4 py-3">
+          <div>
+            <p className="text-xs font-bold uppercase tracking-wider text-primary">Selected plan</p>
+            <p className="text-sm text-foreground">
+              {selectedPlanDetails ? `${selectedPlanDetails.name} · ${selectedPlanDetails.priceDisplay}` : "Choose a plan to continue"}
+            </p>
+          </div>
+          <Button type="button" variant="outline" size="sm" onClick={() => setPlansOpen(true)}>
+            Change plan
+          </Button>
+        </div>
+
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-6">
           <Button type="button" variant="outline" className="justify-center gap-2" onClick={handleGithubImport}>
             <Github className="h-4 w-4" />
@@ -256,7 +207,7 @@ export default function NewProject() {
                 ) : (
                   <>
                     <Terminal className="mr-2 h-4 w-4" />
-                    CREATE PROJECT
+                    CONTINUE TO AI BUILDER
                   </>
                 )}
               </Button>
