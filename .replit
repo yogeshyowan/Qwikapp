@@ -70,3 +70,9 @@ externalPort = 3000
 
 [nix]
 channel = "stable-25_05"
+
+[userenv]
+
+[userenv.shared]
+GOOGLE_CLIENT_ID = "464015322034-acv0ms9e19g0s2cbnvcbegs7ff8biiht.apps.googleusercontent.com"
+VITE_GOOGLE_CLIENT_ID = "464015322034-acv0ms9e19g0s2cbnvcbegs7ff8biiht.apps.googleusercontent.com"
