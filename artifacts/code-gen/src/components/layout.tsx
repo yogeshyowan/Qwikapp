@@ -12,7 +12,7 @@ import { useAuth } from "@/contexts/auth-context";
 
 const navItems = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/projects/new", label: "New Project", icon: Plus },
+  { href: "/projects/new", label: "Create Project", icon: Plus },
   { href: "/chat", label: "AI Assistant", icon: MessageSquare },
   { href: "/billing", label: "Billing", icon: CreditCard },
 ];

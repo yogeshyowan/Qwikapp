@@ -1,11 +1,11 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useLocation } from "wouter";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { useCreateProject, getListProjectsQueryKey } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
-import { Terminal, Loader2 } from "lucide-react";
+import { Github, Loader2, Terminal, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
@@ -24,6 +24,7 @@ export default function NewProject() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const createProject = useCreateProject();
+  const zipInputRef = useRef<HTMLInputElement | null>(null);
   
   const [isGenerating, setIsGenerating] = useState(false);
   const [generationLogs, setGenerationLogs] = useState<string[]>([]);
@@ -33,14 +34,29 @@ export default function NewProject() {
     defaultValues: {
       title: "",
       description: "",
-      techStack: "React",
+      techStack: "Web App",
     },
   });
+
+  const handleGithubImport = () => {
+    toast({
+      title: "GitHub import",
+      description: "GitHub import will be connected here.",
+    });
+  };
+
+  const handleZipImport = (file?: File) => {
+    if (!file) return;
+    toast({
+      title: "Zip file selected",
+      description: `${file.name} is ready to import once import processing is connected.`,
+    });
+  };
 
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
     try {
       setIsGenerating(true);
-      setGenerationLogs(["Initializing generation protocol...", `Target stack: ${values.techStack}`, "Booting AI assistant..."]);
+      setGenerationLogs(["Initializing generation protocol...", `Project type: ${values.techStack}`, "Booting AI assistant..."]);
       
       const project = await createProject.mutateAsync({ data: values });
       
@@ -145,11 +161,29 @@ export default function NewProject() {
   return (
     <div className="max-w-2xl mx-auto mt-8">
       <div className="mb-8">
-        <h1 className="text-3xl font-bold tracking-tight mb-2">Initialize New Project</h1>
+        <h1 className="text-3xl font-bold tracking-tight mb-2">Create Project</h1>
         <p className="text-muted-foreground">Describe your app idea, and Claude will generate the code and deploy it.</p>
       </div>
 
       <div className="border border-border bg-card rounded-lg p-6 shadow-sm">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-6">
+          <Button type="button" variant="outline" className="justify-center gap-2" onClick={handleGithubImport}>
+            <Github className="h-4 w-4" />
+            Import from GitHub
+          </Button>
+          <Button type="button" variant="outline" className="justify-center gap-2" onClick={() => zipInputRef.current?.click()}>
+            <Upload className="h-4 w-4" />
+            Import from Zip File
+          </Button>
+          <input
+            ref={zipInputRef}
+            type="file"
+            accept=".zip,application/zip,application/x-zip-compressed"
+            className="hidden"
+            onChange={(event) => handleZipImport(event.target.files?.[0])}
+          />
+        </div>
+
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
             <FormField
@@ -171,19 +205,22 @@ export default function NewProject() {
               name="techStack"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel className="text-foreground font-bold tracking-wide uppercase text-xs">Target Environment</FormLabel>
+                  <FormLabel className="text-foreground font-bold tracking-wide uppercase text-xs">Project Type</FormLabel>
                   <Select onValueChange={field.onChange} defaultValue={field.value}>
                     <FormControl>
                       <SelectTrigger className="bg-background font-mono">
-                        <SelectValue placeholder="Select stack" />
+                        <SelectValue placeholder="Select project type" />
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      <SelectItem value="React">React (Vite)</SelectItem>
-                      <SelectItem value="Next.js">Next.js</SelectItem>
-                      <SelectItem value="Node.js">Node.js (Express)</SelectItem>
-                      <SelectItem value="Python Flask">Python Flask</SelectItem>
-                      <SelectItem value="Full-Stack">Full-Stack (React + Node)</SelectItem>
+                      <SelectItem value="Web App">Web App</SelectItem>
+                      <SelectItem value="Mobile App">Mobile App</SelectItem>
+                      <SelectItem value="Website">Website</SelectItem>
+                      <SelectItem value="Presentation">Presentation</SelectItem>
+                      <SelectItem value="Dashboard">Dashboard</SelectItem>
+                      <SelectItem value="Blog">Blog</SelectItem>
+                      <SelectItem value="Document">Document</SelectItem>
+                      <SelectItem value="3D Game">3D Game</SelectItem>
                     </SelectContent>
                   </Select>
                   <FormMessage />
@@ -219,7 +256,7 @@ export default function NewProject() {
                 ) : (
                   <>
                     <Terminal className="mr-2 h-4 w-4" />
-                    EXECUTE GENERATION
+                    CREATE PROJECT
                   </>
                 )}
               </Button>

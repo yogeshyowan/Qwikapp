@@ -51,7 +51,7 @@ export default function Dashboard() {
         <Link href="/projects/new">
           <Button size="sm" className="gap-2 shrink-0">
             <Plus className="h-4 w-4" />
-            New Project
+            Create Project
           </Button>
         </Link>
       </div>

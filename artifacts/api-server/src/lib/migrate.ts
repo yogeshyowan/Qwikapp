@@ -29,6 +29,41 @@ export async function runMigrations(): Promise<void> {
         updated_at              TIMESTAMPTZ DEFAULT NOW() NOT NULL
       );
 
+      CREATE TABLE IF NOT EXISTS projects (
+        id              SERIAL PRIMARY KEY,
+        title           TEXT NOT NULL,
+        description     TEXT NOT NULL,
+        tech_stack      TEXT NOT NULL,
+        status          TEXT NOT NULL DEFAULT 'pending',
+        conversation_id TEXT,
+        created_at      TIMESTAMPTZ DEFAULT NOW() NOT NULL,
+        updated_at      TIMESTAMPTZ DEFAULT NOW() NOT NULL
+      );
+
+      CREATE TABLE IF NOT EXISTS project_files (
+        id          SERIAL PRIMARY KEY,
+        project_id  INTEGER NOT NULL,
+        filename    TEXT NOT NULL,
+        language    TEXT NOT NULL,
+        content     TEXT NOT NULL,
+        created_at  TIMESTAMPTZ DEFAULT NOW() NOT NULL
+      );
+
+      CREATE TABLE IF NOT EXISTS conversations (
+        id          SERIAL PRIMARY KEY,
+        title       TEXT NOT NULL,
+        created_at  TIMESTAMPTZ DEFAULT NOW() NOT NULL,
+        updated_at  TIMESTAMPTZ DEFAULT NOW() NOT NULL
+      );
+
+      CREATE TABLE IF NOT EXISTS messages (
+        id              SERIAL PRIMARY KEY,
+        conversation_id INTEGER NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,
+        role            TEXT NOT NULL,
+        content         TEXT NOT NULL,
+        created_at      TIMESTAMPTZ DEFAULT NOW() NOT NULL
+      );
+
       CREATE TABLE IF NOT EXISTS token_usage (
         id                          SERIAL PRIMARY KEY,
         user_id                     INTEGER NOT NULL,
